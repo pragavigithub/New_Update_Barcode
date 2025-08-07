@@ -1006,7 +1006,7 @@ class SAPIntegration:
             "ToWarehouse": transfer_document.to_warehouse,
             "StockTransferLines": stock_transfer_lines
         }
-        print(transfer_data)
+        print(f"transfer_item (repr) --> {repr(transfer_data)}")
         # Log the JSON payload for debugging
         logging.info(f"📤 Sending stock transfer to SAP B1:")
         logging.info(f"JSON payload: {json.dumps(transfer_data, indent=2)}")
