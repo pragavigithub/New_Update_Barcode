@@ -421,7 +421,7 @@ def grpo():
                     GRPODocument.po_number.contains(search_term),
                     GRPODocument.status.contains(search_term),
                     GRPODocument.sap_document_number.contains(search_term),
-                    GRPODocument.vendor_name.contains(search_term)
+                    GRPODocument.supplier_name.contains(search_term)
                 )
             )
         
@@ -955,8 +955,8 @@ def inventory_transfer():
                     InventoryTransfer.transfer_request_number.contains(search_term),
                     InventoryTransfer.status.contains(search_term),
                     InventoryTransfer.sap_document_number.contains(search_term),
-                    InventoryTransfer.from_warehouse_code.contains(search_term),
-                    InventoryTransfer.to_warehouse_code.contains(search_term)
+                    InventoryTransfer.from_warehouse.contains(search_term),
+                    InventoryTransfer.to_warehouse.contains(search_term)
                 )
             )
         

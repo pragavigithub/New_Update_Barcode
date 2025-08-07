@@ -55,12 +55,13 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 
 ## Recent Changes
 - **2025-08-07**: Successfully completed migration from Replit Agent to standard Replit environment
-- **2025-08-07**: Added search and pagination functionality to GRN (GRPO) screen
-- **2025-08-07**: Added search and pagination functionality to Inventory Transfer screen
-- **2025-08-07**: Enhanced UI with search forms and pagination controls in both templates
-- **2025-08-07**: Implemented 10 records per page pagination with navigation controls
-- **2025-08-07**: Added search functionality for PO numbers, status, SAP documents, and vendor names
+- **2025-08-07**: Added comprehensive search and pagination functionality to GRN (GRPO) screen
+- **2025-08-07**: Added comprehensive search and pagination functionality to Inventory Transfer screen
+- **2025-08-07**: Enhanced UI with Bootstrap-styled search forms and pagination controls
+- **2025-08-07**: Implemented 10 records per page pagination with navigation controls and result counters
+- **2025-08-07**: Added search functionality for PO numbers, status, SAP documents, vendor names, and warehouse codes
 - **2025-08-07**: PostgreSQL database fully configured and operational in Replit environment
+- **2025-08-07**: Maintained MySQL database synchronization for local development environments
 - **2025-08-04**: Enhanced QR code system with qrcode[pil] library for better compatibility
 - **2025-08-04**: Added `/api/print-qr-label` endpoint with format "SO123456 | ItemCode: 98765 | Date: 2025-08-04"
 - **2025-08-04**: Maintained MySQL priority configuration for local development
