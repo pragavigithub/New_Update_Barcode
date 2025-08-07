@@ -410,7 +410,7 @@ def grpo():
         # Get search and pagination parameters
         search_term = request.args.get('search', '').strip()
         page = request.args.get('page', 1, type=int)
-        per_page = 10  # Show 10 records per page
+        per_page = request.args.get('per_page', 10, type=int)  # Default 10, allow user selection
         
         # Build query with search functionality
         query = GRPODocument.query.filter_by(user_id=current_user.id)
@@ -441,7 +441,8 @@ def grpo():
     return render_template('grpo.html', 
                          documents=documents, 
                          pagination=documents_pagination,
-                         search_term=search_term)
+                         search_term=search_term,
+                         per_page=per_page)
 
 @app.route('/grpo/create', methods=['POST'])
 @login_required
@@ -944,7 +945,7 @@ def inventory_transfer():
         # Get search and pagination parameters
         search_term = request.args.get('search', '').strip()
         page = request.args.get('page', 1, type=int)
-        per_page = 10  # Show 10 records per page
+        per_page = request.args.get('per_page', 10, type=int)  # Default 10, allow user selection
         
         # Build query with search functionality
         query = InventoryTransfer.query.filter_by(user_id=current_user.id)
@@ -976,7 +977,8 @@ def inventory_transfer():
     return render_template('inventory_transfer.html', 
                          transfers=transfers,
                          pagination=transfers_pagination,
-                         search_term=search_term)
+                         search_term=search_term,
+                         per_page=per_page)
 
 @app.route('/inventory_transfer/create', methods=['POST'])
 @login_required
