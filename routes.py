@@ -407,12 +407,41 @@ def grpo():
         return redirect(url_for('dashboard'))
     
     try:
-        documents = GRPODocument.query.filter_by(user_id=current_user.id).order_by(GRPODocument.created_at.desc()).all()
+        # Get search and pagination parameters
+        search_term = request.args.get('search', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = 10  # Show 10 records per page
+        
+        # Build query with search functionality
+        query = GRPODocument.query.filter_by(user_id=current_user.id)
+        
+        if search_term:
+            query = query.filter(
+                db.or_(
+                    GRPODocument.po_number.contains(search_term),
+                    GRPODocument.status.contains(search_term),
+                    GRPODocument.sap_document_number.contains(search_term),
+                    GRPODocument.vendor_name.contains(search_term)
+                )
+            )
+        
+        # Add pagination
+        documents_pagination = query.order_by(GRPODocument.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        documents = documents_pagination.items
+        
     except Exception as e:
         logging.error(f"Database error in grpo: {e}")
         documents = []
+        documents_pagination = None
         flash('Database needs to be updated. Please run: python migrate_database.py', 'warning')
-    return render_template('grpo.html', documents=documents)
+    
+    return render_template('grpo.html', 
+                         documents=documents, 
+                         pagination=documents_pagination,
+                         search_term=search_term)
 
 @app.route('/grpo/create', methods=['POST'])
 @login_required
@@ -911,8 +940,43 @@ def inventory_transfer():
         flash('Access denied. You do not have permission to access Inventory Transfer screen.', 'error')
         return redirect(url_for('dashboard'))
     
-    transfers = InventoryTransfer.query.filter_by(user_id=current_user.id).order_by(InventoryTransfer.created_at.desc()).all()
-    return render_template('inventory_transfer.html', transfers=transfers)
+    try:
+        # Get search and pagination parameters
+        search_term = request.args.get('search', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = 10  # Show 10 records per page
+        
+        # Build query with search functionality
+        query = InventoryTransfer.query.filter_by(user_id=current_user.id)
+        
+        if search_term:
+            query = query.filter(
+                db.or_(
+                    InventoryTransfer.transfer_request_number.contains(search_term),
+                    InventoryTransfer.status.contains(search_term),
+                    InventoryTransfer.sap_document_number.contains(search_term),
+                    InventoryTransfer.from_warehouse_code.contains(search_term),
+                    InventoryTransfer.to_warehouse_code.contains(search_term)
+                )
+            )
+        
+        # Add pagination
+        transfers_pagination = query.order_by(InventoryTransfer.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        transfers = transfers_pagination.items
+        
+    except Exception as e:
+        logging.error(f"Database error in inventory_transfer: {e}")
+        transfers = []
+        transfers_pagination = None
+        flash('Database error occurred', 'warning')
+    
+    return render_template('inventory_transfer.html', 
+                         transfers=transfers,
+                         pagination=transfers_pagination,
+                         search_term=search_term)
 
 @app.route('/inventory_transfer/create', methods=['POST'])
 @login_required
