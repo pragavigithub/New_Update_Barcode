@@ -239,13 +239,31 @@ class PickList(db.Model):
     __tablename__ = 'pick_lists'
 
     id = db.Column(db.Integer, primary_key=True)
-    sales_order_number = db.Column(db.String(20), nullable=False)
-    pick_list_number = db.Column(db.String(20), nullable=False)
-    status = db.Column(
-        db.String(20),
-        default='pending')  # pending, approved, rejected, completed
+    # SAP B1 fields
+    absolute_entry = db.Column(db.Integer, nullable=True)  # From SAP B1 Absoluteentry
+    name = db.Column(db.String(50), nullable=False)  # From SAP B1 Name field
+    owner_code = db.Column(db.Integer, nullable=True)  # From SAP B1 OwnerCode
+    owner_name = db.Column(db.String(100), nullable=True)  # From SAP B1 OwnerName
+    pick_date = db.Column(db.DateTime, nullable=True)  # From SAP B1 PickDate
+    remarks = db.Column(db.Text, nullable=True)  # From SAP B1 Remarks
+    status = db.Column(db.String(20), default='pending')  # SAP B1: ps_Open, ps_Closed, ps_Released
+    object_type = db.Column(db.String(10), nullable=True, default='156')  # From SAP B1 ObjectType
+    use_base_units = db.Column(db.String(5), nullable=True, default='tNO')  # From SAP B1 UseBaseUnits
+    
+    # Legacy fields for backward compatibility
+    sales_order_number = db.Column(db.String(20), nullable=True)
+    pick_list_number = db.Column(db.String(20), nullable=True)
+    
+    # WMS specific fields
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     approver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    priority = db.Column(db.String(10), nullable=True, default='normal')  # low, normal, high, urgent
+    warehouse_code = db.Column(db.String(10), nullable=True)
+    customer_code = db.Column(db.String(20), nullable=True)
+    customer_name = db.Column(db.String(100), nullable=True)
+    total_items = db.Column(db.Integer, nullable=True, default=0)
+    picked_items = db.Column(db.Integer, nullable=True, default=0)
+    notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime,
                         default=datetime.utcnow,
@@ -256,10 +274,12 @@ class PickList(db.Model):
                         back_populates='pick_lists',
                         foreign_keys=[user_id])
     approver = relationship('User', foreign_keys=[approver_id])
-    items = relationship('PickListItem', back_populates='pick_list')
+    items = relationship('PickListItem', back_populates='pick_list', cascade='all, delete-orphan')
+    lines = relationship('PickListLine', back_populates='pick_list', cascade='all, delete-orphan', lazy='dynamic')
 
 
 class PickListItem(db.Model):
+    """Legacy PickListItem for backward compatibility"""
     __tablename__ = 'pick_list_items'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -275,6 +295,62 @@ class PickListItem(db.Model):
 
     # Relationships
     pick_list = relationship('PickList', back_populates='items')
+
+
+class PickListLine(db.Model):
+    """SAP B1 compatible PickListLine model based on PickListsLines structure"""
+    __tablename__ = 'pick_list_lines'
+
+    id = db.Column(db.Integer, primary_key=True)
+    pick_list_id = db.Column(db.Integer, db.ForeignKey('pick_lists.id'), nullable=False)
+    
+    # SAP B1 PickListsLines fields
+    absolute_entry = db.Column(db.Integer, nullable=True)  # From SAP B1 AbsoluteEntry
+    line_number = db.Column(db.Integer, nullable=False)  # From SAP B1 LineNumber
+    order_entry = db.Column(db.Integer, nullable=True)  # From SAP B1 OrderEntry
+    order_row_id = db.Column(db.Integer, nullable=True)  # From SAP B1 OrderRowID
+    picked_quantity = db.Column(db.Float, nullable=True, default=0)  # From SAP B1 PickedQuantity
+    pick_status = db.Column(db.String(20), nullable=True, default='ps_Open')  # From SAP B1 PickStatus
+    released_quantity = db.Column(db.Float, nullable=True, default=0)  # From SAP B1 ReleasedQuantity
+    previously_released_quantity = db.Column(db.Float, nullable=True, default=0)  # From SAP B1 PreviouslyReleasedQuantity
+    base_object_type = db.Column(db.Integer, nullable=True, default=17)  # From SAP B1 BaseObjectType
+    
+    # WMS specific fields
+    item_code = db.Column(db.String(50), nullable=True)
+    item_name = db.Column(db.String(200), nullable=True)
+    unit_of_measure = db.Column(db.String(10), nullable=True)
+    serial_numbers = db.Column(db.Text, nullable=True)  # JSON array of serial numbers
+    batch_numbers = db.Column(db.Text, nullable=True)  # JSON array of batch numbers
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    pick_list = relationship('PickList', back_populates='lines')
+    bin_allocations = relationship('PickListBinAllocation', back_populates='pick_list_line', cascade='all, delete-orphan', lazy='dynamic')
+
+
+class PickListBinAllocation(db.Model):
+    """SAP B1 compatible bin allocation model based on DocumentLinesBinAllocations structure"""
+    __tablename__ = 'pick_list_bin_allocations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    pick_list_line_id = db.Column(db.Integer, db.ForeignKey('pick_list_lines.id'), nullable=False)
+    
+    # SAP B1 DocumentLinesBinAllocations fields
+    bin_abs_entry = db.Column(db.Integer, nullable=True)  # From SAP B1 BinAbsEntry
+    quantity = db.Column(db.Float, nullable=False)  # From SAP B1 Quantity
+    allow_negative_quantity = db.Column(db.String(5), nullable=True, default='tNO')  # From SAP B1 AllowNegativeQuantity
+    serial_and_batch_numbers_base_line = db.Column(db.Integer, nullable=True, default=0)  # From SAP B1 SerialAndBatchNumbersBaseLine
+    base_line_number = db.Column(db.Integer, nullable=True)  # From SAP B1 BaseLineNumber
+    
+    # WMS specific fields
+    bin_code = db.Column(db.String(20), nullable=True)
+    bin_location = db.Column(db.String(50), nullable=True)
+    warehouse_code = db.Column(db.String(10), nullable=True)
+    picked_quantity = db.Column(db.Float, nullable=True, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    pick_list_line = relationship('PickListLine', back_populates='bin_allocations')
 
 
 class InventoryCount(db.Model):

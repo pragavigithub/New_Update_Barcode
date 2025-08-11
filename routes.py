@@ -9,6 +9,7 @@ from barcode_generator import BarcodeGenerator
 from app import app, db, login_manager
 from models import User, GRPODocument, GRPOItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel, BinScanningLog, DocumentNumberSeries, QRCodeLabel
 from sap_integration import SAPIntegration
+from sqlalchemy import or_
 
 # BinScanningLog is now imported above
 
@@ -1392,31 +1393,199 @@ def pick_list():
         flash('Access denied. You do not have permission to access Pick List screen.', 'error')
         return redirect(url_for('dashboard'))
     
-    pick_lists = PickList.query.filter_by(user_id=current_user.id).order_by(PickList.created_at.desc()).all()
-    return render_template('pick_list.html', pick_lists=pick_lists)
+    # Get search parameters
+    search_query = request.args.get('search', '')
+    status_filter = request.args.get('status', 'all')
+    priority_filter = request.args.get('priority', 'all')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    
+    # Start with base query
+    query = PickList.query
+    
+    # Apply search filters
+    if search_query:
+        search_filter = or_(
+            PickList.name.ilike(f'%{search_query}%'),
+            PickList.sales_order_number.ilike(f'%{search_query}%'),
+            PickList.customer_name.ilike(f'%{search_query}%'),
+            PickList.warehouse_code.ilike(f'%{search_query}%')
+        )
+        query = query.filter(search_filter)
+    
+    # Apply status filter
+    if status_filter != 'all':
+        query = query.filter(PickList.status == status_filter)
+    
+    # Apply priority filter
+    if priority_filter != 'all':
+        query = query.filter(PickList.priority == priority_filter)
+    
+    # Apply user filter (non-admin users see only their records)
+    if current_user.role not in ['admin', 'manager']:
+        query = query.filter(PickList.user_id == current_user.id)
+    
+    # Order by creation date
+    query = query.order_by(PickList.created_at.desc())
+    
+    # Paginate results
+    pick_lists = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Try to sync with SAP B1 for latest data
+    try:
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        sap_result = sap.get_pick_lists(limit=50)
+        if sap_result.get('success'):
+            # Store SAP pick lists count for display
+            sap_count = sap_result.get('total_count', 0)
+        else:
+            sap_count = 0
+    except Exception as e:
+        logging.warning(f"Could not sync with SAP B1: {str(e)}")
+        sap_count = 0
+    
+    return render_template('pick_list.html', 
+                         pick_lists=pick_lists,
+                         search_query=search_query,
+                         status_filter=status_filter,
+                         priority_filter=priority_filter,
+                         sap_count=sap_count)
 
 @app.route('/pick_list/<int:pick_list_id>')
 @login_required
 def pick_list_detail(pick_list_id):
     pick_list = PickList.query.get_or_404(pick_list_id)
+    
+    # Check access permissions
+    if pick_list.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+        flash('Access denied - You can only view your own pick lists', 'error')
+        return redirect(url_for('pick_list'))
+    
+    # If this pick list has an absolute_entry, sync with SAP B1
+    if pick_list.absolute_entry:
+        try:
+            from sap_integration import SAPIntegration
+            sap = SAPIntegration()
+            sap_result = sap.get_pick_list_by_id(pick_list.absolute_entry)
+            if sap_result.get('success'):
+                sap_pick_list = sap_result['pick_list']
+                # Update local record with SAP data if needed
+                if sap_pick_list.get('Status') != pick_list.status:
+                    pick_list.status = sap_pick_list.get('Status', pick_list.status)
+                    db.session.commit()
+            else:
+                flash('Warning: Could not sync with SAP B1', 'warning')
+        except Exception as e:
+            logging.warning(f"Could not sync pick list with SAP B1: {str(e)}")
+    
     return render_template('pick_list_detail.html', pick_list=pick_list)
+
+@app.route('/api/sync-sap-pick-lists', methods=['POST'])
+@login_required
+def sync_sap_pick_lists():
+    """Sync pick lists from SAP B1 to local database"""
+    if not current_user.has_permission('pick_list'):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        
+        # Get pick lists from SAP B1
+        sap_result = sap.get_pick_lists(limit=100)
+        if not sap_result.get('success'):
+            return jsonify({
+                'success': False, 
+                'error': sap_result.get('error', 'Failed to fetch from SAP B1')
+            })
+        
+        sap_pick_lists = sap_result.get('pick_lists', [])
+        synced_count = 0
+        updated_count = 0
+        
+        for sap_pick_list in sap_pick_lists:
+            absolute_entry = sap_pick_list.get('Absoluteentry')
+            if not absolute_entry:
+                continue
+            
+            # Check if pick list exists locally
+            existing_pick_list = PickList.query.filter_by(absolute_entry=absolute_entry).first()
+            
+            if existing_pick_list:
+                # Update existing record
+                existing_pick_list.status = sap_pick_list.get('Status', existing_pick_list.status)
+                existing_pick_list.remarks = sap_pick_list.get('Remarks', existing_pick_list.remarks)
+                if sap_pick_list.get('PickDate'):
+                    try:
+                        existing_pick_list.pick_date = datetime.strptime(
+                            sap_pick_list['PickDate'][:19], '%Y-%m-%dT%H:%M:%S'
+                        )
+                    except:
+                        pass
+                updated_count += 1
+            else:
+                # Create new record
+                pick_list = PickList(
+                    absolute_entry=absolute_entry,
+                    name=sap_pick_list.get('Name', f'SAP-{absolute_entry}'),
+                    owner_code=sap_pick_list.get('OwnerCode'),
+                    owner_name=sap_pick_list.get('OwnerName'),
+                    remarks=sap_pick_list.get('Remarks'),
+                    status=sap_pick_list.get('Status', 'ps_Open'),
+                    object_type=sap_pick_list.get('ObjectType', '156'),
+                    use_base_units=sap_pick_list.get('UseBaseUnits', 'tNO'),
+                    user_id=current_user.id
+                )
+                
+                if sap_pick_list.get('PickDate'):
+                    try:
+                        pick_list.pick_date = datetime.strptime(
+                            sap_pick_list['PickDate'][:19], '%Y-%m-%dT%H:%M:%S'
+                        )
+                    except:
+                        pass
+                
+                db.session.add(pick_list)
+                synced_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Synced {synced_count} new pick lists, updated {updated_count} existing ones',
+            'synced_count': synced_count,
+            'updated_count': updated_count
+        })
+        
+    except Exception as e:
+        logging.error(f"Error syncing SAP pick lists: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/create_pick_list', methods=['POST'])
 @login_required
 def create_pick_list():
     sales_order_number = request.form.get('sales_order_number')
     pick_list_number = request.form.get('pick_list_number')
+    name = request.form.get('name') or pick_list_number
     
-    if not sales_order_number or not pick_list_number:
-        flash('Sales order number and pick list number are required', 'error')
+    if not name:
+        flash('Pick list name is required', 'error')
         return redirect(url_for('pick_list'))
     
-    # Create new pick list
+    # Create new pick list with updated model
     pick_list = PickList(
+        name=name,
         sales_order_number=sales_order_number,
         pick_list_number=pick_list_number,
         user_id=current_user.id,
-        status='pending'
+        status='pending',
+        priority=request.form.get('priority', 'normal'),
+        warehouse_code=request.form.get('warehouse_code'),
+        customer_name=request.form.get('customer_name'),
+        notes=request.form.get('notes')
     )
     
     db.session.add(pick_list)

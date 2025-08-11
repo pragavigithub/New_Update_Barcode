@@ -59,6 +59,7 @@ class SAPIntegration:
         except Exception as e:
             logging.warning(
                 f"SAP B1 login error: {str(e)}. Running in offline mode.")
+            self.is_offline = True
             return False
 
     def ensure_logged_in(self):
@@ -1117,6 +1118,207 @@ class SAPIntegration:
             logging.error(
                 f"Error creating inventory counting in SAP B1: {str(e)}")
             return {'success': False, 'error': str(e)}
+
+    def get_pick_lists(self, limit=100, offset=0, status_filter=None, date_filter=None):
+        """Get pick lists from SAP B1 using the exact API structure provided"""
+        if not self.ensure_logged_in():
+            logging.warning("SAP B1 not available, returning mock pick list data")
+            return self._get_mock_pick_lists()
+
+        try:
+            # Build filter parameters
+            filters = []
+            if status_filter:
+                filters.append(f"Status eq '{status_filter}'")
+            if date_filter:
+                filters.append(f"PickDate ge '{date_filter}'")
+            
+            filter_clause = " and ".join(filters) if filters else ""
+            
+            # Construct URL with OData parameters
+            url = f"{self.base_url}/b1s/v1/PickLists"
+            if filter_clause:
+                url += f"?$filter={filter_clause}"
+            
+            logging.info(f"🔍 Fetching pick lists from SAP B1: {url}")
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                pick_lists = data.get('value', [])
+                logging.info(f"✅ Found {len(pick_lists)} pick lists in SAP B1")
+                return {
+                    'success': True,
+                    'pick_lists': pick_lists,
+                    'total_count': len(pick_lists)
+                }
+            else:
+                logging.error(f"❌ Error fetching pick lists: {response.status_code} - {response.text}")
+                return {'success': False, 'error': f'HTTP {response.status_code}'}
+                
+        except Exception as e:
+            logging.error(f"Error getting pick lists from SAP B1: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def get_pick_list_by_id(self, absolute_entry):
+        """Get specific pick list from SAP B1 by AbsoluteEntry"""
+        if not self.ensure_logged_in():
+            logging.warning("SAP B1 not available, returning mock pick list data")
+            return self._get_mock_pick_list_detail(absolute_entry)
+
+        try:
+            url = f"{self.base_url}/b1s/v1/PickLists?$filter=Absoluteentry eq {absolute_entry}"
+            logging.info(f"🔍 Fetching pick list {absolute_entry} from SAP B1")
+            
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                pick_lists = data.get('value', [])
+                if pick_lists:
+                    logging.info(f"✅ Found pick list {absolute_entry}")
+                    return {
+                        'success': True,
+                        'pick_list': pick_lists[0]
+                    }
+                else:
+                    return {'success': False, 'error': 'Pick list not found'}
+            else:
+                logging.error(f"❌ Error fetching pick list: {response.status_code} - {response.text}")
+                return {'success': False, 'error': f'HTTP {response.status_code}'}
+                
+        except Exception as e:
+            logging.error(f"Error getting pick list {absolute_entry} from SAP B1: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def update_pick_list_status(self, absolute_entry, new_status, picked_quantities=None):
+        """Update pick list status and quantities in SAP B1"""
+        if not self.ensure_logged_in():
+            logging.warning("SAP B1 not available - cannot update pick list")
+            return {'success': False, 'error': 'SAP B1 not available'}
+
+        try:
+            # First get the current pick list
+            pick_list_result = self.get_pick_list_by_id(absolute_entry)
+            if not pick_list_result['success']:
+                return pick_list_result
+            
+            pick_list = pick_list_result['pick_list']
+            
+            # Build update payload
+            update_data = {
+                'Status': new_status
+            }
+            
+            # Update line quantities if provided
+            if picked_quantities:
+                lines = pick_list.get('PickListsLines', [])
+                for line in lines:
+                    line_number = line.get('LineNumber')
+                    if line_number in picked_quantities:
+                        line['PickedQuantity'] = picked_quantities[line_number]
+                        line['PickStatus'] = new_status
+                
+                update_data['PickListsLines'] = lines
+            
+            url = f"{self.base_url}/b1s/v1/PickLists({absolute_entry})"
+            response = self.session.patch(url, json=update_data)
+            
+            if response.status_code == 204:
+                logging.info(f"✅ Pick list {absolute_entry} updated successfully")
+                return {'success': True}
+            else:
+                logging.error(f"❌ Error updating pick list: {response.status_code} - {response.text}")
+                return {'success': False, 'error': f'HTTP {response.status_code}'}
+                
+        except Exception as e:
+            logging.error(f"Error updating pick list {absolute_entry}: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _get_mock_pick_lists(self):
+        """Return mock pick list data for offline/development mode"""
+        return {
+            'success': True,
+            'pick_lists': [
+                {
+                    "Absoluteentry": 613,
+                    "Name": "SCM-ORD",
+                    "OwnerCode": 15,
+                    "OwnerName": "Demo User",
+                    "PickDate": "2024-02-02T00:00:00Z",
+                    "Remarks": "Mock pick list for development",
+                    "Status": "ps_Open",
+                    "ObjectType": "156",
+                    "UseBaseUnits": "tNO",
+                    "PickListsLines": [
+                        {
+                            "AbsoluteEntry": 613,
+                            "LineNumber": 0,
+                            "OrderEntry": 1236,
+                            "OrderRowID": 0,
+                            "PickedQuantity": 0.0,
+                            "PickStatus": "ps_Open",
+                            "ReleasedQuantity": 0.0,
+                            "PreviouslyReleasedQuantity": 0.0,
+                            "BaseObjectType": 17,
+                            "SerialNumbers": [],
+                            "BatchNumbers": [],
+                            "DocumentLinesBinAllocations": [
+                                {
+                                    "BinAbsEntry": 1,
+                                    "Quantity": 1000.0,
+                                    "AllowNegativeQuantity": "tNO",
+                                    "SerialAndBatchNumbersBaseLine": 0,
+                                    "BaseLineNumber": 0
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            'total_count': 1
+        }
+
+    def _get_mock_pick_list_detail(self, absolute_entry):
+        """Return mock pick list detail for development"""
+        return {
+            'success': True,
+            'pick_list': {
+                "Absoluteentry": absolute_entry,
+                "Name": f"MOCK-{absolute_entry}",
+                "OwnerCode": 15,
+                "OwnerName": "Demo User",
+                "PickDate": "2024-02-02T00:00:00Z",
+                "Remarks": "Mock pick list detail",
+                "Status": "ps_Open",
+                "ObjectType": "156",
+                "UseBaseUnits": "tNO",
+                "PickListsLines": [
+                    {
+                        "AbsoluteEntry": absolute_entry,
+                        "LineNumber": 0,
+                        "OrderEntry": 1236,
+                        "OrderRowID": 0,
+                        "PickedQuantity": 0.0,
+                        "PickStatus": "ps_Open",
+                        "ReleasedQuantity": 0.0,
+                        "PreviouslyReleasedQuantity": 0.0,
+                        "BaseObjectType": 17,
+                        "SerialNumbers": [],
+                        "BatchNumbers": [],
+                        "DocumentLinesBinAllocations": [
+                            {
+                                "BinAbsEntry": 1,
+                                "Quantity": 1000.0,
+                                "AllowNegativeQuantity": "tNO",
+                                "SerialAndBatchNumbersBaseLine": 0,
+                                "BaseLineNumber": 0
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
 
     def sync_warehouses(self):
         """Sync warehouses from SAP B1 to local database"""

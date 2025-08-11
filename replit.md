@@ -54,6 +54,12 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Integration Focus**: SAP B1 integration with batch management and warehouse operations
 
 ## Recent Changes
+- **2025-08-11**: Successfully migrated from Replit Agent to standard Replit environment
+- **2025-08-11**: Updated PickList models to match SAP B1 API structure exactly (Absoluteentry, Name, OwnerCode, PickListsLines, DocumentLinesBinAllocations)
+- **2025-08-11**: Added comprehensive SAP B1 PickList integration with get_pick_lists(), get_pick_list_by_id(), and update_pick_list_status()
+- **2025-08-11**: Enhanced PickList routes with search, pagination, and SAP B1 synchronization
+- **2025-08-11**: Added /api/sync-sap-pick-lists endpoint for real-time SAP B1 data synchronization
+- **2025-08-11**: Implemented PickListLine and PickListBinAllocation models for full SAP B1 compatibility
 - **2025-08-07**: Successfully completed migration from Replit Agent to standard Replit environment
 - **2025-08-07**: Added comprehensive search and pagination functionality to GRN (GRPO) screen
 - **2025-08-07**: Added comprehensive search and pagination functionality to Inventory Transfer screen
