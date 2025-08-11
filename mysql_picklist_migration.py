@@ -103,6 +103,20 @@ class PickListMigration:
             else:
                 logger.info(f"⏭️ Column {column_name} already exists")
         
+        # Fix nullable constraints for SAP B1 compatibility (August 2025 update)
+        nullable_fixes = [
+            ("sales_order_number", "MODIFY COLUMN sales_order_number VARCHAR(50) NULL"),
+            ("pick_list_number", "MODIFY COLUMN pick_list_number VARCHAR(50) NULL")
+        ]
+        
+        for column_name, alter_statement in nullable_fixes:
+            try:
+                sql = f"ALTER TABLE pick_lists {alter_statement}"
+                self.cursor.execute(sql)
+                logger.info(f"✅ Made column {column_name} nullable for SAP B1 compatibility")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not modify {column_name}: {str(e)}")
+        
         # Add index on absolute_entry for SAP B1 sync
         try:
             self.cursor.execute("SHOW INDEX FROM pick_lists WHERE Key_name = 'idx_absolute_entry'")
@@ -111,6 +125,15 @@ class PickListMigration:
                 logger.info("✅ Added index on absolute_entry")
         except Exception as e:
             logger.error(f"❌ Error creating index: {str(e)}")
+        
+        # Add unique constraint on absolute_entry for SAP B1 sync
+        try:
+            self.cursor.execute("SHOW INDEX FROM pick_lists WHERE Key_name = 'unique_absolute_entry'")
+            if not self.cursor.fetchone():
+                self.cursor.execute("CREATE UNIQUE INDEX unique_absolute_entry ON pick_lists(absolute_entry)")
+                logger.info("✅ Added unique constraint on absolute_entry")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not add unique constraint on absolute_entry: {str(e)}")
     
     def create_pick_list_lines_table(self):
         """Create the pick_list_lines table for SAP B1 compatibility"""

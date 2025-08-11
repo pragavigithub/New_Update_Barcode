@@ -1,11 +1,11 @@
-# MySQL PickList Migration Guide
+# MySQL PickList Migration Guide - August 2025 Update
 
-This guide helps you migrate your MySQL database to support the new SAP B1 compatible PickList structure.
+This guide helps you migrate your MySQL database to support the complete SAP B1 compatible PickList structure with all recent enhancements.
 
-## What This Migration Does
+## What This Migration Does (August 2025 Update)
 
 ### Updates to `pick_lists` Table
-- Adds SAP B1 compatible columns:
+- Adds complete SAP B1 compatible columns:
   - `absolute_entry` - SAP B1 unique identifier
   - `name` - Pick list name from SAP B1
   - `owner_code` - SAP B1 owner code
@@ -22,14 +22,25 @@ This guide helps you migrate your MySQL database to support the new SAP B1 compa
   - `picked_items` - Picked items count
   - `notes` - Additional notes
 
+### Schema Fixes (August 2025)
+- Makes `sales_order_number` and `pick_list_number` nullable for SAP B1 compatibility
+- Adds performance indexes on SAP B1 fields
+- Adds unique constraint on `absolute_entry` for data integrity
+
 ### Creates New Tables
 1. **`pick_list_lines`** - Individual line items in pick lists
-   - Maps to SAP B1 PickListsLines structure
-   - Includes item details, quantities, status
+   - Maps exactly to SAP B1 PickListsLines structure
+   - Includes item details, quantities, status, and tracking
+   - Enhanced with item_code, item_name, and warehouse fields
 
 2. **`pick_list_bin_allocations`** - Bin allocation details
-   - Maps to SAP B1 DocumentLinesBinAllocations structure
-   - Manages bin locations and quantities
+   - Maps exactly to SAP B1 DocumentLinesBinAllocations structure
+   - Manages bin locations and quantities with full tracking
+   - Includes picked_quantity tracking for real-time updates
+
+### Creates Integration Views
+1. **`vw_sap_pick_lists`** - Complete pick list view with aggregated line data
+2. **`vw_pick_list_metrics`** - Performance metrics and completion tracking
 
 ## Prerequisites
 
@@ -54,17 +65,22 @@ This guide helps you migrate your MySQL database to support the new SAP B1 compa
 
 ## How to Run the Migration
 
-### Option 1: Quick Run (Recommended)
+### Option 1: Complete Migration (Recommended - August 2025)
+```bash
+python mysql_complete_migration.py
+```
+
+### Option 2: Quick Run (Legacy)
 ```bash
 python run_mysql_picklist_migration.py
 ```
 
-### Option 2: Direct Migration
+### Option 3: Direct Migration (Legacy)
 ```bash
 python mysql_picklist_migration.py
 ```
 
-### Option 3: Manual Environment Setup
+### Option 4: Manual Environment Setup
 ```python
 import os
 os.environ['MYSQL_HOST'] = 'your_host'
