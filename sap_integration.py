@@ -1279,6 +1279,69 @@ class SAPIntegration:
             'total_count': 1
         }
 
+    def sync_pick_list_to_local_db(self, sap_pick_list, local_pick_list):
+        """Sync SAP B1 pick list line items and bin allocations to local database"""
+        from app import db
+        from models import PickListLine, PickListBinAllocation
+        import json
+        
+        try:
+            # Clear existing lines and bin allocations
+            PickListBinAllocation.query.join(PickListLine).filter(
+                PickListLine.pick_list_id == local_pick_list.id
+            ).delete()
+            PickListLine.query.filter_by(pick_list_id=local_pick_list.id).delete()
+            
+            # Sync PickListsLines from SAP B1
+            sap_lines = sap_pick_list.get('PickListsLines', [])
+            for sap_line in sap_lines:
+                # Create PickListLine
+                pick_list_line = PickListLine(
+                    pick_list_id=local_pick_list.id,
+                    absolute_entry=sap_line.get('AbsoluteEntry'),
+                    line_number=sap_line.get('LineNumber', 0),
+                    order_entry=sap_line.get('OrderEntry'),
+                    order_row_id=sap_line.get('OrderRowID'),
+                    picked_quantity=float(sap_line.get('PickedQuantity', 0)),
+                    pick_status=sap_line.get('PickStatus', 'ps_Open'),
+                    released_quantity=float(sap_line.get('ReleasedQuantity', 0)),
+                    previously_released_quantity=float(sap_line.get('PreviouslyReleasedQuantity', 0)),
+                    base_object_type=sap_line.get('BaseObjectType', 17),
+                    serial_numbers=json.dumps(sap_line.get('SerialNumbers', [])),
+                    batch_numbers=json.dumps(sap_line.get('BatchNumbers', []))
+                )
+                db.session.add(pick_list_line)
+                db.session.flush()  # Get the ID
+                
+                # Sync DocumentLinesBinAllocations
+                bin_allocations = sap_line.get('DocumentLinesBinAllocations', [])
+                for bin_allocation in bin_allocations:
+                    pick_list_bin_allocation = PickListBinAllocation(
+                        pick_list_line_id=pick_list_line.id,
+                        bin_abs_entry=bin_allocation.get('BinAbsEntry'),
+                        quantity=float(bin_allocation.get('Quantity', 0)),
+                        allow_negative_quantity=bin_allocation.get('AllowNegativeQuantity', 'tNO'),
+                        serial_and_batch_numbers_base_line=bin_allocation.get('SerialAndBatchNumbersBaseLine', 0),
+                        base_line_number=bin_allocation.get('BaseLineNumber')
+                    )
+                    db.session.add(pick_list_bin_allocation)
+            
+            # Update pick list totals
+            total_lines = len(sap_lines)
+            picked_lines = len([line for line in sap_lines if line.get('PickStatus') == 'ps_Closed'])
+            
+            local_pick_list.total_items = total_lines
+            local_pick_list.picked_items = picked_lines
+            
+            db.session.commit()
+            logging.info(f"✅ Synced {total_lines} lines and bin allocations for pick list {local_pick_list.absolute_entry}")
+            return {'success': True, 'synced_lines': total_lines}
+            
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"❌ Error syncing pick list to local DB: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
     def _get_mock_pick_list_detail(self, absolute_entry):
         """Return mock pick list detail for development"""
         return {

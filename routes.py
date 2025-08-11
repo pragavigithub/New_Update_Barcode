@@ -1477,19 +1477,123 @@ def pick_list_detail(pick_list_id):
             sap_result = sap.get_pick_list_by_id(pick_list.absolute_entry)
             if sap_result.get('success'):
                 sap_pick_list = sap_result['pick_list']
+                
                 # Update local record with SAP data if needed
                 if sap_pick_list.get('Status') != pick_list.status:
                     pick_list.status = sap_pick_list.get('Status', pick_list.status)
-                    db.session.commit()
+                
+                # Sync line items and bin allocations to local database
+                sync_result = sap.sync_pick_list_to_local_db(sap_pick_list, pick_list)
+                if sync_result.get('success'):
+                    # Refresh pick list lines after sync
+                    pick_list_lines = PickListLine.query.filter_by(pick_list_id=pick_list.id).all()
+                    logging.info(f"✅ Synced {sync_result.get('synced_lines', 0)} lines from SAP B1")
+                else:
+                    logging.warning(f"Failed to sync pick list lines: {sync_result.get('error')}")
+                
+                db.session.commit()
             else:
                 flash('Warning: Could not sync with SAP B1', 'warning')
         except Exception as e:
             logging.warning(f"Could not sync pick list with SAP B1: {str(e)}")
+    else:
+        # If no absolute_entry, try to find and link this pick list in SAP B1
+        try:
+            from sap_integration import SAPIntegration
+            sap = SAPIntegration()
+            # Try to find pick list by name or other identifier
+            sap_result = sap.get_pick_lists(limit=100)
+            if sap_result.get('success'):
+                sap_pick_lists = sap_result.get('pick_lists', [])
+                # Try to match by name or sales order number
+                for sap_pl in sap_pick_lists:
+                    if (sap_pl.get('Name') == pick_list.name or 
+                        str(sap_pl.get('Absoluteentry')) == str(pick_list.pick_list_number)):
+                        # Found a match, link it
+                        pick_list.absolute_entry = sap_pl.get('Absoluteentry')
+                        # Sync the data
+                        sync_result = sap.sync_pick_list_to_local_db(sap_pl, pick_list)
+                        if sync_result.get('success'):
+                            pick_list_lines = PickListLine.query.filter_by(pick_list_id=pick_list.id).all()
+                            sap_pick_list = sap_pl
+                        db.session.commit()
+                        break
+        except Exception as e:
+            logging.warning(f"Could not search SAP B1 for pick list match: {str(e)}")
     
     return render_template('pick_list_detail.html', 
                          pick_list=pick_list, 
                          pick_list_lines=pick_list_lines,
                          sap_pick_list=sap_pick_list)
+
+@app.route('/api/create-pick-list-from-sap/<int:absolute_entry>', methods=['POST'])
+@login_required
+def create_pick_list_from_sap(absolute_entry):
+    """Create or update a pick list from SAP B1 data"""
+    if not current_user.has_permission('pick_list'):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        
+        # Get pick list data from SAP B1
+        sap_result = sap.get_pick_list_by_id(absolute_entry)
+        if not sap_result.get('success'):
+            return jsonify({
+                'success': False, 
+                'error': f'Could not fetch pick list {absolute_entry} from SAP B1: {sap_result.get("error")}'
+            })
+        
+        sap_pick_list = sap_result['pick_list']
+        
+        # Check if pick list already exists locally
+        existing_pick_list = PickList.query.filter_by(absolute_entry=absolute_entry).first()
+        
+        if existing_pick_list:
+            # Update existing pick list
+            pick_list = existing_pick_list
+        else:
+            # Create new pick list
+            pick_list = PickList(
+                name=sap_pick_list.get('Name', f'SAP-{absolute_entry}'),
+                absolute_entry=absolute_entry,
+                user_id=current_user.id,
+                status=sap_pick_list.get('Status', 'pending')
+            )
+            db.session.add(pick_list)
+            db.session.flush()  # Get the ID
+        
+        # Update pick list fields from SAP B1
+        pick_list.owner_code = sap_pick_list.get('OwnerCode')
+        pick_list.owner_name = sap_pick_list.get('OwnerName')
+        pick_list.pick_date = datetime.strptime(sap_pick_list.get('PickDate', '2025-01-01T00:00:00Z')[:19], '%Y-%m-%dT%H:%M:%S') if sap_pick_list.get('PickDate') else None
+        pick_list.remarks = sap_pick_list.get('Remarks')
+        pick_list.status = sap_pick_list.get('Status', 'pending')
+        pick_list.object_type = sap_pick_list.get('ObjectType', '156')
+        pick_list.use_base_units = sap_pick_list.get('UseBaseUnits', 'tNO')
+        
+        # Sync line items and bin allocations
+        sync_result = sap.sync_pick_list_to_local_db(sap_pick_list, pick_list)
+        if not sync_result.get('success'):
+            return jsonify({
+                'success': False, 
+                'error': f'Failed to sync line items: {sync_result.get("error")}'
+            })
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'pick_list_id': pick_list.id,
+            'synced_lines': sync_result.get('synced_lines', 0),
+            'message': f'Pick list {absolute_entry} synced successfully with {sync_result.get("synced_lines", 0)} line items'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error creating pick list from SAP: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/sync-sap-pick-lists', methods=['POST'])
 @login_required

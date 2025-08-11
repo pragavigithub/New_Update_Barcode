@@ -54,6 +54,10 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Integration Focus**: SAP B1 integration with batch management and warehouse operations
 
 ## Recent Changes
+- **2025-08-11**: Fixed pick list line item synchronization from SAP B1 to local database
+- **2025-08-11**: Added sync_pick_list_to_local_db() function for complete PickListsLines and DocumentLinesBinAllocations sync
+- **2025-08-11**: Enhanced pick list detail route to automatically sync SAP B1 data when absolute_entry exists
+- **2025-08-11**: Created /api/create-pick-list-from-sap/<absolute_entry> endpoint for manual SAP B1 pick list import
 - **2025-08-11**: Successfully migrated from Replit Agent to standard Replit environment
 - **2025-08-11**: Updated PickList models to match SAP B1 API structure exactly (Absoluteentry, Name, OwnerCode, PickListsLines, DocumentLinesBinAllocations)
 - **2025-08-11**: Added comprehensive SAP B1 PickList integration with get_pick_lists(), get_pick_list_by_id(), and update_pick_list_status()
