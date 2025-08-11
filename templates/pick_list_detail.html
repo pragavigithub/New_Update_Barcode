@@ -51,11 +51,23 @@
                                 <span class="badge bg-danger">Rejected</span>
                             {% elif pick_list.status == 'completed' %}
                                 <span class="badge bg-info">Completed</span>
+                            {% elif pick_list.status == 'ps_Open' %}
+                                <span class="badge bg-primary">SAP Open</span>
+                            {% elif pick_list.status == 'ps_Closed' %}
+                                <span class="badge bg-success">SAP Closed</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ pick_list.status }}</span>
                             {% endif %}
                         </p>
                     </div>
                     <div class="col-sm-6">
-                        <p><strong>Sales Order:</strong><br>{{ pick_list.sales_order_number }}</p>
+                        <p><strong>SAP Entry:</strong><br>
+                            {% if pick_list.absolute_entry %}
+                                #{{ pick_list.absolute_entry }}
+                            {% else %}
+                                {{ pick_list.sales_order_number or 'N/A' }}
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="col-sm-6">
                         <p><strong>Assigned To:</strong><br>{{ pick_list.user.first_name }} {{ pick_list.user.last_name }}</p>
@@ -115,7 +127,80 @@
                 </div>
             </div>
             <div class="card-body">
-                {% if pick_list.items %}
+                {% if pick_list_lines %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Line #</th>
+                                <th>Order Entry</th>
+                                <th>Picked Qty</th>
+                                <th>Released Qty</th>
+                                <th>Previously Released</th>
+                                <th>Status</th>
+                                <th>Base Object</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in pick_list_lines %}
+                            <tr>
+                                <td><strong>{{ line.line_number }}</strong></td>
+                                <td>{{ line.order_entry }}</td>
+                                <td><span class="badge bg-success">{{ "{:,.0f}".format(line.picked_quantity) }}</span></td>
+                                <td>{{ "{:,.0f}".format(line.released_quantity) }}</td>
+                                <td>{{ "{:,.0f}".format(line.previously_released_quantity) }}</td>
+                                <td>
+                                    {% if line.pick_status == 'ps_Open' %}
+                                        <span class="badge bg-primary">Open</span>
+                                    {% elif line.pick_status == 'ps_Closed' %}
+                                        <span class="badge bg-success">Closed</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ line.pick_status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ line.base_object_type }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info" onclick="showBinAllocations({{ line.id }})">
+                                        <i data-feather="map-pin"></i> Bins
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Summary Card -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <h5 class="text-primary">{{ pick_list_lines|length }}</h5>
+                                        <small class="text-muted">Total Lines</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h5 class="text-success">{{ pick_list.picked_items }}</h5>
+                                        <small class="text-muted">Picked Items</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h5 class="text-info">{{ "{:,.0f}".format(pick_list_lines|sum(attribute='picked_quantity')) }}</h5>
+                                        <small class="text-muted">Total Picked Qty</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h5 class="text-warning">{{ "{:,.0f}".format(pick_list_lines|sum(attribute='previously_released_quantity')) }}</h5>
+                                        <small class="text-muted">Total Released</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% elif pick_list.items %}
+                <!-- Legacy items display for backward compatibility -->
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>

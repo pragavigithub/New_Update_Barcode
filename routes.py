@@ -1464,7 +1464,12 @@ def pick_list_detail(pick_list_id):
         flash('Access denied - You can only view your own pick lists', 'error')
         return redirect(url_for('pick_list'))
     
+    # Get pick list lines and bin allocations
+    from models import PickListLine, PickListBinAllocation
+    pick_list_lines = PickListLine.query.filter_by(pick_list_id=pick_list.id).all()
+    
     # If this pick list has an absolute_entry, sync with SAP B1
+    sap_pick_list = None
     if pick_list.absolute_entry:
         try:
             from sap_integration import SAPIntegration
@@ -1481,7 +1486,10 @@ def pick_list_detail(pick_list_id):
         except Exception as e:
             logging.warning(f"Could not sync pick list with SAP B1: {str(e)}")
     
-    return render_template('pick_list_detail.html', pick_list=pick_list)
+    return render_template('pick_list_detail.html', 
+                         pick_list=pick_list, 
+                         pick_list_lines=pick_list_lines,
+                         sap_pick_list=sap_pick_list)
 
 @app.route('/api/sync-sap-pick-lists', methods=['POST'])
 @login_required
@@ -1562,6 +1570,127 @@ def sync_sap_pick_lists():
         
     except Exception as e:
         logging.error(f"Error syncing SAP pick lists: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/import-sap-pick-list/<int:absolute_entry>', methods=['POST'])
+@login_required
+def import_sap_pick_list(absolute_entry):
+    """Import specific pick list from SAP B1 with all line items and bin allocations"""
+    if not current_user.has_permission('pick_list'):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        from sap_integration import SAPIntegration
+        from models import PickListLine, PickListBinAllocation
+        
+        sap = SAPIntegration()
+        
+        # Get specific pick list from SAP B1
+        sap_result = sap.get_pick_list_by_id(absolute_entry)
+        if not sap_result.get('success'):
+            return jsonify({
+                'success': False, 
+                'error': sap_result.get('error', 'Failed to fetch pick list from SAP B1')
+            })
+        
+        sap_pick_list = sap_result.get('pick_list')
+        if not sap_pick_list:
+            return jsonify({'success': False, 'error': 'Pick list not found'})
+        
+        # Check if pick list exists locally
+        existing_pick_list = PickList.query.filter_by(absolute_entry=absolute_entry).first()
+        
+        if existing_pick_list:
+            pick_list = existing_pick_list
+            # Clear existing lines and allocations
+            PickListBinAllocation.query.join(PickListLine).filter(
+                PickListLine.pick_list_id == pick_list.id
+            ).delete()
+            PickListLine.query.filter_by(pick_list_id=pick_list.id).delete()
+        else:
+            # Create new pick list
+            pick_list = PickList(
+                absolute_entry=absolute_entry,
+                name=sap_pick_list.get('Name', f'SAP-{absolute_entry}'),
+                owner_code=sap_pick_list.get('OwnerCode'),
+                owner_name=sap_pick_list.get('OwnerName'),
+                remarks=sap_pick_list.get('Remarks'),
+                status=sap_pick_list.get('Status', 'ps_Open'),
+                object_type=sap_pick_list.get('ObjectType', '156'),
+                use_base_units=sap_pick_list.get('UseBaseUnits', 'tNO'),
+                user_id=current_user.id
+            )
+            
+            if sap_pick_list.get('PickDate'):
+                try:
+                    pick_list.pick_date = datetime.strptime(
+                        sap_pick_list['PickDate'][:19], '%Y-%m-%dT%H:%M:%S'
+                    )
+                except:
+                    pass
+            
+            db.session.add(pick_list)
+        
+        # Update existing fields
+        pick_list.status = sap_pick_list.get('Status', pick_list.status)
+        pick_list.remarks = sap_pick_list.get('Remarks', pick_list.remarks)
+        
+        db.session.flush()  # Get the pick_list.id
+        
+        # Import pick list lines
+        lines_imported = 0
+        allocations_imported = 0
+        
+        for sap_line in sap_pick_list.get('PickListsLines', []):
+            pick_list_line = PickListLine(
+                pick_list_id=pick_list.id,
+                absolute_entry=sap_line.get('AbsoluteEntry'),
+                line_number=sap_line.get('LineNumber'),
+                order_entry=sap_line.get('OrderEntry'),
+                order_row_id=sap_line.get('OrderRowID', 0),
+                picked_quantity=sap_line.get('PickedQuantity', 0.0),
+                pick_status=sap_line.get('PickStatus', 'ps_Open'),
+                released_quantity=sap_line.get('ReleasedQuantity', 0.0),
+                previously_released_quantity=sap_line.get('PreviouslyReleasedQuantity', 0.0),
+                base_object_type=sap_line.get('BaseObjectType')
+            )
+            
+            db.session.add(pick_list_line)
+            db.session.flush()  # Get the line id
+            lines_imported += 1
+            
+            # Import bin allocations for this line
+            for sap_allocation in sap_line.get('DocumentLinesBinAllocations', []):
+                bin_allocation = PickListBinAllocation(
+                    pick_list_line_id=pick_list_line.id,
+                    bin_abs_entry=sap_allocation.get('BinAbsEntry'),
+                    quantity=sap_allocation.get('Quantity', 0.0),
+                    allow_negative_quantity=sap_allocation.get('AllowNegativeQuantity', 'tNO'),
+                    serial_and_batch_numbers_base_line=sap_allocation.get('SerialAndBatchNumbersBaseLine', 0),
+                    base_line_number=sap_allocation.get('BaseLineNumber')
+                )
+                
+                db.session.add(bin_allocation)
+                allocations_imported += 1
+        
+        # Update pick list totals
+        pick_list.total_items = lines_imported
+        pick_list.picked_items = len([line for line in sap_pick_list.get('PickListsLines', []) 
+                                    if line.get('PickStatus') == 'ps_Closed'])
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Imported pick list {absolute_entry} with {lines_imported} lines and {allocations_imported} bin allocations',
+            'pick_list_id': pick_list.id,
+            'lines_imported': lines_imported,
+            'allocations_imported': allocations_imported
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error importing SAP pick list {absolute_entry}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/create_pick_list', methods=['POST'])

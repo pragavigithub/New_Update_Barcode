@@ -118,13 +118,13 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'  # type: ignore
 login_manager.login_message = 'Please log in to access this page.'
 
-# SAP B1 Configuration
+# SAP B1 Configuration - Updated with user's real SAP server
 app.config['SAP_B1_SERVER'] = os.environ.get('SAP_B1_SERVER',
-                                             'https://192.168.0.194:50000')
+                                             'https://10.112.253.173:50000')
 app.config['SAP_B1_USERNAME'] = os.environ.get('SAP_B1_USERNAME', 'manager')
 app.config['SAP_B1_PASSWORD'] = os.environ.get('SAP_B1_PASSWORD', '1422')
 app.config['SAP_B1_COMPANY_DB'] = os.environ.get('SAP_B1_COMPANY_DB',
-                                                 'EINV-TESTDB-LIVE-HUST')
+                                                 'SBODemoUS')
 
 # Import models after app is configured to avoid circular imports
 import models
