@@ -242,8 +242,15 @@
                                         <small class="text-muted">Closed Lines</small>
                                     </div>
                                     <div class="col-md-3">
-                                        {% set total_bins = sap_pick_list.PickListsLines|sum(attribute='DocumentLinesBinAllocations')|length %}
-                                        <h5 class="text-warning">{{ total_bins if total_bins else 0 }}</h5>
+                                        <h5 class="text-warning">
+                                            {% set ns = namespace(count=0) %}
+                                            {% for line in sap_pick_list.PickListsLines %}
+                                                {% if line.DocumentLinesBinAllocations %}
+                                                    {% set ns.count = ns.count + (line.DocumentLinesBinAllocations|length) %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            {{ ns.count }}
+                                        </h5>
                                         <small class="text-muted">Total Bin Allocations</small>
                                     </div>
                                 </div>
