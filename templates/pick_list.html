@@ -100,19 +100,54 @@
             <form method="POST" action="{{ url_for('create_pick_list') }}">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="sales_order_number" class="form-label">Sales Order Number</label>
+                        <label for="sap_pick_list_number" class="form-label">SAP Pick List Number (Absolute Entry)</label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="sales_order_number" name="sales_order_number" required>
-                            <button class="btn btn-outline-secondary" type="button" onclick="scanSalesOrder()">
+                            <input type="text" class="form-control" id="sap_pick_list_number" name="sap_pick_list_number" placeholder="e.g. 613" required>
+                            <button class="btn btn-outline-primary" type="button" onclick="lookupPickListDetails()">
+                                <i data-feather="search"></i> Lookup Details
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" onclick="scanPickListNumber()">
                                 <i data-feather="camera"></i> Scan
                             </button>
                         </div>
+                        <small class="form-text text-muted">Enter the SAP Pick List Absolute Entry number to fetch item details and allocations</small>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="pick_list_number" class="form-label">Pick List Number</label>
-                        <input type="text" class="form-control" id="pick_list_number" name="pick_list_number" required>
+                    <!-- Pick List Details Section (Hidden initially) -->
+                    <div id="pickListDetailsSection" style="display: none;">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Pick List Details</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Name:</strong> <span id="pickListName">-</span></p>
+                                        <p><strong>Status:</strong> <span id="pickListStatus">-</span></p>
+                                        <p><strong>Pick Date:</strong> <span id="pickListDate">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Owner Code:</strong> <span id="pickListOwner">-</span></p>
+                                        <p><strong>Object Type:</strong> <span id="pickListObjectType">-</span></p>
+                                        <p><strong>Total Lines:</strong> <span id="pickListTotalLines">-</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Item Lines Section -->
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Pick List Lines & Bin Allocations</h6>
+                                <div id="pickListLines" class="table-responsive">
+                                    <!-- Dynamic content will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    
+                    <!-- Hidden fields for backward compatibility -->
+                    <input type="hidden" id="sales_order_number" name="sales_order_number" value="">
+                    <input type="hidden" id="pick_list_number" name="pick_list_number" value="">
+                    <input type="hidden" id="absolute_entry" name="absolute_entry" value="">
                     
                     <div class="scanner-container" id="pickListScannerContainer" style="display: none;">
                         <video id="pickListScanVideo" class="scanner-video" autoplay></video>
@@ -163,6 +198,131 @@
 
 {% block scripts %}
 <script>
+// New function for SAP Pick List lookup
+async function lookupPickListDetails() {
+    const sapPickListNumber = document.getElementById('sap_pick_list_number').value.trim();
+    
+    if (!sapPickListNumber) {
+        alert('Please enter a SAP Pick List number');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const lookupBtn = document.querySelector('button[onclick="lookupPickListDetails()"]');
+        const originalText = lookupBtn.innerHTML;
+        lookupBtn.innerHTML = '<i data-feather="loader"></i> Loading...';
+        lookupBtn.disabled = true;
+        
+        const response = await fetch(`/api/lookup-pick-list/${sapPickListNumber}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.pick_list) {
+            displayPickListDetails(data.pick_list);
+            
+            // Populate hidden fields for form submission
+            document.getElementById('absolute_entry').value = data.pick_list.Absoluteentry || sapPickListNumber;
+            document.getElementById('pick_list_number').value = data.pick_list.Name || sapPickListNumber;
+            document.getElementById('sales_order_number').value = data.pick_list.Name || '';
+        } else {
+            alert(data.message || 'Pick List not found in SAP B1');
+            document.getElementById('pickListDetailsSection').style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('Error looking up pick list:', error);
+        alert('Error connecting to SAP B1 system');
+        document.getElementById('pickListDetailsSection').style.display = 'none';
+    } finally {
+        // Restore button state
+        const lookupBtn = document.querySelector('button[onclick="lookupPickListDetails()"]');
+        lookupBtn.innerHTML = originalText;
+        lookupBtn.disabled = false;
+        feather.replace();
+    }
+}
+
+function displayPickListDetails(pickList) {
+    // Show the details section
+    document.getElementById('pickListDetailsSection').style.display = 'block';
+    
+    // Populate basic details
+    document.getElementById('pickListName').textContent = pickList.Name || '-';
+    document.getElementById('pickListStatus').textContent = pickList.Status || '-';
+    document.getElementById('pickListDate').textContent = pickList.PickDate ? new Date(pickList.PickDate).toLocaleDateString() : '-';
+    document.getElementById('pickListOwner').textContent = pickList.OwnerCode || '-';
+    document.getElementById('pickListObjectType').textContent = pickList.ObjectType || '-';
+    document.getElementById('pickListTotalLines').textContent = pickList.PickListsLines ? pickList.PickListsLines.length : '0';
+    
+    // Build pick list lines table
+    if (pickList.PickListsLines && pickList.PickListsLines.length > 0) {
+        let linesHtml = `
+            <table class="table table-sm table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Line #</th>
+                        <th>Order Entry</th>
+                        <th>Picked Qty</th>
+                        <th>Status</th>
+                        <th>Bin Allocations</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        pickList.PickListsLines.forEach(line => {
+            let binAllocationsHtml = '';
+            if (line.DocumentLinesBinAllocations && line.DocumentLinesBinAllocations.length > 0) {
+                binAllocationsHtml = '<ul class="list-unstyled mb-0">';
+                line.DocumentLinesBinAllocations.forEach(bin => {
+                    binAllocationsHtml += `<li><small>Bin ${bin.BinAbsEntry}: ${bin.Quantity}</small></li>`;
+                });
+                binAllocationsHtml += '</ul>';
+            } else {
+                binAllocationsHtml = '<small class="text-muted">No allocations</small>';
+            }
+            
+            linesHtml += `
+                <tr>
+                    <td>${line.LineNumber}</td>
+                    <td>${line.OrderEntry || '-'}</td>
+                    <td>${line.PickedQuantity || 0}</td>
+                    <td><span class="badge ${line.PickStatus === 'ps_Closed' ? 'bg-success' : 'bg-warning'}">${line.PickStatus || 'Open'}</span></td>
+                    <td>${binAllocationsHtml}</td>
+                </tr>
+            `;
+        });
+        
+        linesHtml += '</tbody></table>';
+        document.getElementById('pickListLines').innerHTML = linesHtml;
+    } else {
+        document.getElementById('pickListLines').innerHTML = '<p class="text-muted">No lines found</p>';
+    }
+}
+
+// New function for scanning Pick List numbers
+function scanPickListNumber() {
+    const container = document.getElementById('pickListScannerContainer');
+    const video = document.getElementById('pickListScanVideo');
+    
+    container.style.display = 'block';
+    
+    startBarcodeScanner('pickListScanVideo', function(code) {
+        document.getElementById('sap_pick_list_number').value = code;
+        container.style.display = 'none';
+        stopBarcodeScanner();
+        
+        // Auto-lookup details after scanning
+        lookupPickListDetails();
+    });
+}
+
 function scanSalesOrder() {
     const container = document.getElementById('pickListScannerContainer');
     const video = document.getElementById('pickListScanVideo');

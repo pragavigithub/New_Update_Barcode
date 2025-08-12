@@ -1797,20 +1797,92 @@ def import_sap_pick_list(absolute_entry):
         logging.error(f"Error importing SAP pick list {absolute_entry}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/lookup-pick-list/<int:absolute_entry>', methods=['GET'])
+@login_required
+def lookup_pick_list_details(absolute_entry):
+    """Lookup Pick List details from SAP B1 by Absolute Entry"""
+    try:
+        sap = SAPIntegration()
+        
+        if sap.ensure_logged_in():
+            try:
+                # Use the URL format from user's SAP B1 data
+                url = f"{sap.base_url}/b1s/v1/PickLists?$filter=Absoluteentry eq {absolute_entry}"
+                response = sap.session.get(url, timeout=15)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    pick_lists = data.get('value', [])
+                    
+                    if pick_lists:
+                        pick_list = pick_lists[0]  # Get the first (should be only) result
+                        logging.info(f"✅ Found Pick List {absolute_entry}: {pick_list.get('Name', 'Unnamed')}")
+                        
+                        return jsonify({
+                            'success': True,
+                            'pick_list': pick_list,
+                            'message': f'Pick List {absolute_entry} found successfully'
+                        })
+                    else:
+                        logging.warning(f"⚠️ Pick List {absolute_entry} not found in SAP B1")
+                        return jsonify({
+                            'success': False,
+                            'message': f'Pick List {absolute_entry} not found in SAP B1'
+                        })
+                        
+                else:
+                    logging.error(f"❌ SAP B1 API error: {response.status_code} - {response.text}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'SAP B1 API error: {response.status_code}'
+                    })
+                    
+            except Exception as e:
+                logging.error(f"❌ Error fetching Pick List from SAP B1: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Error connecting to SAP B1: {str(e)}'
+                })
+        else:
+            logging.warning("⚠️ SAP B1 not available, cannot lookup Pick List")
+            return jsonify({
+                'success': False,
+                'message': 'SAP B1 system not available'
+            })
+            
+    except Exception as e:
+        logging.error(f"❌ Unexpected error in pick list lookup: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Unexpected error: {str(e)}'
+        })
+
 @app.route('/create_pick_list', methods=['POST'])
 @login_required
 def create_pick_list():
+    # Updated to handle SAP Pick List number
+    sap_pick_list_number = request.form.get('sap_pick_list_number')
     sales_order_number = request.form.get('sales_order_number')
     pick_list_number = request.form.get('pick_list_number')
-    name = request.form.get('name') or pick_list_number
+    absolute_entry = request.form.get('absolute_entry')
     
-    if not name:
-        flash('Pick list name is required', 'error')
+    # Use SAP pick list number as primary identifier
+    name = pick_list_number or sap_pick_list_number or 'Pick List'
+    
+    if not sap_pick_list_number:
+        flash('SAP Pick List number is required', 'error')
         return redirect(url_for('pick_list'))
     
-    # Create new pick list with updated model
+    # Check if pick list already exists with this absolute entry
+    existing_pick_list = PickList.query.filter_by(absolute_entry=absolute_entry).first()
+    if existing_pick_list:
+        flash(f'Pick List with Absolute Entry {absolute_entry} already exists', 'warning')
+        return redirect(url_for('pick_list_detail', pick_list_id=existing_pick_list.id))
+    
+    # Create new pick list with SAP integration
     pick_list = PickList(
         name=name,
+        absolute_entry=int(absolute_entry) if absolute_entry else None,
         sales_order_number=sales_order_number,
         pick_list_number=pick_list_number,
         user_id=current_user.id,
@@ -1824,7 +1896,41 @@ def create_pick_list():
     db.session.add(pick_list)
     db.session.commit()
     
-    flash('Pick list created successfully', 'success')
+    # Try to sync the pick list details from SAP B1 
+    try:
+        if absolute_entry:
+            from sap_integration import sync_pick_list_to_local_db
+            sync_result = sync_pick_list_to_local_db(int(absolute_entry))
+            if sync_result:
+                flash('Pick list created and synced with SAP B1 successfully', 'success')
+            else:
+                flash('Pick list created but SAP B1 sync failed', 'warning')
+        else:
+            flash('Pick list created successfully', 'success')
+    except Exception as e:
+        logging.error(f"Error syncing pick list: {str(e)}")
+        flash('Pick list created but SAP B1 sync failed', 'warning')
+    
+    return redirect(url_for('pick_list_detail', pick_list_id=pick_list.id))
+    
+    db.session.add(pick_list)
+    db.session.commit()
+    
+    # Try to sync the pick list details from SAP B1 
+    try:
+        if absolute_entry:
+            from sap_integration import sync_pick_list_to_local_db
+            sync_result = sync_pick_list_to_local_db(int(absolute_entry))
+            if sync_result:
+                flash('Pick list created and synced with SAP B1 successfully', 'success')
+            else:
+                flash('Pick list created but SAP B1 sync failed', 'warning')
+        else:
+            flash('Pick list created successfully', 'success')
+    except Exception as e:
+        logging.error(f"Error syncing pick list: {str(e)}")
+        flash('Pick list created but SAP B1 sync failed', 'warning')
+    
     return redirect(url_for('pick_list_detail', pick_list_id=pick_list.id))
 
 @app.route('/pick_list/<int:pick_list_id>/approve', methods=['POST'])
