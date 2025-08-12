@@ -360,7 +360,11 @@ def login():
             flash('Invalid username or password.', 'error')
     
     # Get available branches for login form
-    branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+    try:
+        branches = db.session.execute(db.text("SELECT branch_code as id, branch_name as name FROM branches WHERE is_active = TRUE ORDER BY branch_name")).fetchall()
+    except Exception as e:
+        logging.warning(f"Branches query failed, using default: {e}")
+        branches = [{'id': '01', 'name': 'Main Branch'}]
     return render_template('login.html', branches=branches)
 
 @app.route('/logout')

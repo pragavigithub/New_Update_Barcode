@@ -190,6 +190,69 @@ BACKUP_PATH=backups/
             logger.error(f"❌ Failed to create .env file: {e}")
             return False
     
+    def add_missing_columns(self):
+        """Add any missing columns to existing tables"""
+        logger.info("Checking for missing columns in existing tables...")
+        
+        # Check branches table columns
+        if self.table_exists('branches'):
+            missing_columns = []
+            branch_columns = [
+                ('name', 'VARCHAR(100)'),
+                ('description', 'VARCHAR(255)'),
+                ('branch_code', 'VARCHAR(10) UNIQUE'),
+                ('branch_name', 'VARCHAR(100)'),
+                ('city', 'VARCHAR(50)'),
+                ('state', 'VARCHAR(50)'),
+                ('postal_code', 'VARCHAR(20)'),
+                ('country', 'VARCHAR(50)'),
+                ('warehouse_codes', 'TEXT'),
+                ('is_default', 'BOOLEAN DEFAULT FALSE')
+            ]
+            
+            for col_name, col_def in branch_columns:
+                if not self.column_exists('branches', col_name):
+                    missing_columns.append((col_name, col_def))
+            
+            for col_name, col_def in missing_columns:
+                try:
+                    self.execute_query(f"ALTER TABLE branches ADD COLUMN {col_name} {col_def}")
+                    logger.info(f"✅ Added missing column: branches.{col_name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not add column branches.{col_name}: {e}")
+        
+        # Check pick_lists table columns for SAP B1 compatibility
+        if self.table_exists('pick_lists'):
+            pick_list_columns = [
+                ('absolute_entry', 'INT'),
+                ('name', 'VARCHAR(100)'),
+                ('owner_code', 'INT'),
+                ('owner_name', 'VARCHAR(100)'),
+                ('pick_date', 'DATE'),
+                ('status', 'VARCHAR(20) DEFAULT "pending"'),
+                ('object_type', 'VARCHAR(10) DEFAULT "156"'),
+                ('use_base_units', 'VARCHAR(5) DEFAULT "tNO"'),
+                ('priority', 'VARCHAR(20) DEFAULT "normal"'),
+                ('warehouse_code', 'VARCHAR(10)'),
+                ('customer_code', 'VARCHAR(50)'),
+                ('customer_name', 'VARCHAR(100)'),
+                ('total_items', 'INT DEFAULT 0'),
+                ('picked_items', 'INT DEFAULT 0'),
+                ('notes', 'TEXT'),
+                ('remarks', 'TEXT')
+            ]
+            
+            for col_name, col_def in pick_list_columns:
+                if not self.column_exists('pick_lists', col_name):
+                    try:
+                        self.execute_query(f"ALTER TABLE pick_lists ADD COLUMN {col_name} {col_def}")
+                        logger.info(f"✅ Added missing column: pick_lists.{col_name}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not add column pick_lists.{col_name}: {e}")
+        
+        self.connection.commit()
+        logger.info("✅ Column migration completed")
+    
     def create_all_tables(self):
         """Create all WMS tables in correct order (dependencies first)"""
         
@@ -226,23 +289,27 @@ BACKUP_PATH=backups/
             logger.info("Creating branches table...")
             self.execute_query("""
                 CREATE TABLE branches (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    branch_code VARCHAR(10) UNIQUE NOT NULL,
-                    branch_name VARCHAR(100) NOT NULL,
+                    id VARCHAR(10) PRIMARY KEY,
+                    name VARCHAR(100),
+                    description VARCHAR(255),
                     address VARCHAR(255),
-                    city VARCHAR(50),
-                    state VARCHAR(50),
-                    postal_code VARCHAR(20),
-                    country VARCHAR(50),
                     phone VARCHAR(20),
                     email VARCHAR(120),
                     manager_name VARCHAR(100),
                     is_active BOOLEAN DEFAULT TRUE,
+                    is_default BOOLEAN DEFAULT FALSE,
+                    branch_code VARCHAR(10) UNIQUE NOT NULL,
+                    branch_name VARCHAR(100) NOT NULL,
+                    city VARCHAR(50),
+                    state VARCHAR(50),
+                    postal_code VARCHAR(20),
+                    country VARCHAR(50),
                     warehouse_codes TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_branch_code (branch_code),
-                    INDEX idx_active (is_active)
+                    INDEX idx_active (is_active),
+                    INDEX idx_id (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ Branches table created")
@@ -698,11 +765,13 @@ BACKUP_PATH=backups/
         # Default branch
         self.execute_query("""
             INSERT INTO branches (
-                branch_code, branch_name, address, city, state, country,
-                phone, email, manager_name, warehouse_codes
+                id, name, description, branch_code, branch_name, address, city, state, country,
+                phone, email, manager_name, warehouse_codes, is_active, is_default
             ) VALUES (
-                '01', 'Main Branch', '123 Warehouse St', 'Business City', 'State', 'Country',
-                '+1-555-0123', 'main@company.com', 'Warehouse Manager', '01,02,03'
+                'BR001', 'Main Branch', 'Primary warehouse branch', '01', 'Main Branch', 
+                '123 Warehouse St', 'Business City', 'State', 'Country',
+                '+1-555-0123', 'main@company.com', 'Warehouse Manager', '01,02,03',
+                TRUE, TRUE
             )
         """)
         
@@ -768,6 +837,9 @@ BACKUP_PATH=backups/
             # Create .env file
             if not self.create_env_file(config):
                 return False
+            
+            # Add missing columns to existing tables first
+            self.add_missing_columns()
             
             # Create all tables
             if not self.create_all_tables():

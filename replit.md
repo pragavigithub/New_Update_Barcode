@@ -56,6 +56,11 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Configuration Management**: Comprehensive .env file with all WMS module settings
 
 ## Recent Changes
+- **2025-08-12**: Fixed MySQL branches table schema mismatch error by adding missing columns (name, branch_code, branch_name)
+- **2025-08-12**: Added Branch model to models.py for proper database schema compatibility
+- **2025-08-12**: Updated routes.py to handle branches table column name differences gracefully
+- **2025-08-12**: Created fix_mysql_branches_schema.py for quick schema fixes on existing databases
+- **2025-08-12**: Enhanced mysql_complete_migration_final.py with missing column detection and addition
 - **2025-08-12**: Consolidated all MySQL migration files into single comprehensive migration file and removed duplicates
 - **2025-08-12**: Created mysql_complete_migration_final.py as the ONLY MySQL migration file needed for all WMS modules
 - **2025-08-12**: Removed 12+ duplicate MySQL migration files (mysql_migration.py, mysql_complete_migration.py, etc.)

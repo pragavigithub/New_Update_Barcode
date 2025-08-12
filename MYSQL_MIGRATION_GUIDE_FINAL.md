@@ -126,10 +126,17 @@ The migration creates a comprehensive .env file with:
 - Test connection from SAP B1 > Pick Lists screen
 - Check that pick lists have ps_released status items
 
+## Schema Compatibility
+The migration now handles both fresh installations and existing database updates:
+- **Fresh Install**: Creates all tables with proper column names
+- **Existing Database**: Detects missing columns and adds them safely
+- **Mixed Schema**: Handles both `name` and `branch_name` columns in branches table
+- **Error Handling**: Graceful fallback if branches table has column mismatches
+
 ## Files Removed
 The following duplicate migration files have been removed:
 - `mysql_migration.py`
-- `mysql_complete_migration.py`
+- `mysql_complete_migration.py` 
 - `mysql_picklist_migration.py`
 - `mysql_qr_code_migration.py`
 - `mysql_complete_picklist_migration_august_2025.py`
@@ -140,6 +147,13 @@ The following duplicate migration files have been removed:
 - `sync_mysql_changes.py`
 - `qr_code_migration.py`
 - `fix_picklist_schema.py`
+
+## Quick Fix Tool
+If you have an existing database with column issues, run:
+```bash
+python fix_mysql_branches_schema.py
+```
+This will add any missing columns to the branches table without data loss.
 
 ## Support
 If you need to re-run the migration:

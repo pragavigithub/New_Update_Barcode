@@ -543,6 +543,7 @@ class QRCodeLabel(db.Model):
         return content
 
 
+
 class DocumentNumberSeries(db.Model):
     __tablename__ = 'document_number_series'
 
