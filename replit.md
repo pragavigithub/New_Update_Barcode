@@ -54,6 +54,11 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Integration Focus**: SAP B1 integration with batch management and warehouse operations
 
 ## Recent Changes
+- **2025-08-12**: Configured Pick List module to focus on ps_released items and avoid ps_closed line items for SAP B1 integration
+- **2025-08-12**: Updated SAP integration to filter pick lists by status: defaults to avoiding ps_closed, prefers ps_released items
+- **2025-08-12**: Enhanced sync_pick_list_to_local_db function to skip ps_closed line items during synchronization
+- **2025-08-12**: Updated mock data in SAP integration to reflect ps_released status preference
+- **2025-08-12**: Added UI notification showing "Focusing on ps_released items" in Pick List header
 - **2025-08-12**: Enhanced Pick List module with comprehensive pagination, search, and rows per page functionality matching Bin Scan module patterns
 - **2025-08-12**: Added filter dropdowns for status and priority with real-time filtering capabilities
 - **2025-08-12**: Implemented SAP B1 sync and export buttons for Pick List management

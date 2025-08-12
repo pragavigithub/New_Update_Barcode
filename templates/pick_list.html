@@ -27,7 +27,9 @@
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Pick Lists {% if sap_count > 0 %}<span class="badge bg-primary ms-2">SAP: {{ sap_count }}</span>{% endif %}</h5>
+                    <h5 class="mb-0">Pick Lists {% if sap_count > 0 %}<span class="badge bg-primary ms-2">SAP: {{ sap_count }}</span>{% endif %}
+                        <small class="text-muted ms-2"><i data-feather="info"></i> Focusing on ps_released items</small>
+                    </h5>
                     <div class="d-flex align-items-center">
                         <button class="btn btn-outline-info btn-sm me-2" onclick="syncSAPPickLists()">
                             <i data-feather="refresh-cw"></i> Sync SAP

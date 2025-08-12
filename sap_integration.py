@@ -1204,16 +1204,23 @@ class SAPIntegration:
             return {'success': False, 'error': str(e)}
 
     def get_pick_lists(self, limit=100, offset=0, status_filter=None, date_filter=None):
-        """Get pick lists from SAP B1 using the exact API structure provided"""
+        """Get pick lists from SAP B1 focusing on ps_released items, avoiding ps_closed"""
         if not self.ensure_logged_in():
             logging.warning("SAP B1 not available, returning mock pick list data")
             return self._get_mock_pick_lists()
 
         try:
-            # Build filter parameters
+            # Build filter parameters - focus on ps_released, avoid ps_closed
             filters = []
+            
+            # Default to filtering out ps_closed status unless specifically requested
             if status_filter:
-                filters.append(f"Status eq '{status_filter}'")
+                if status_filter != 'ps_Closed':
+                    filters.append(f"Status eq '{status_filter}'")
+            else:
+                # Default: avoid ps_closed items, prefer ps_released
+                filters.append(f"Status ne 'ps_Closed'")
+            
             if date_filter:
                 filters.append(f"PickDate ge '{date_filter}'")
             
@@ -1224,17 +1231,33 @@ class SAPIntegration:
             if filter_clause:
                 url += f"?$filter={filter_clause}"
             
-            logging.info(f"🔍 Fetching pick lists from SAP B1: {url}")
+            logging.info(f"🔍 Fetching pick lists from SAP B1 (avoiding ps_closed): {url}")
             response = self.session.get(url)
             
             if response.status_code == 200:
                 data = response.json()
                 pick_lists = data.get('value', [])
-                logging.info(f"✅ Found {len(pick_lists)} pick lists in SAP B1")
+                
+                # Additional filtering for ps_released line items
+                filtered_pick_lists = []
+                for pick_list in pick_lists:
+                    # Check if pick list has ps_released line items
+                    has_released_items = False
+                    pick_list_lines = pick_list.get('PickListsLines', [])
+                    for line in pick_list_lines:
+                        if line.get('PickStatus') == 'ps_Released':
+                            has_released_items = True
+                            break
+                    
+                    # Only include pick lists that have ps_released items
+                    if has_released_items or not pick_list_lines:  # Include empty pick lists too
+                        filtered_pick_lists.append(pick_list)
+                
+                logging.info(f"✅ Found {len(filtered_pick_lists)} pick lists with ps_released items (filtered from {len(pick_lists)} total)")
                 return {
                     'success': True,
-                    'pick_lists': pick_lists,
-                    'total_count': len(pick_lists)
+                    'pick_lists': filtered_pick_lists,
+                    'total_count': len(filtered_pick_lists)
                 }
             else:
                 logging.error(f"❌ Error fetching pick lists: {response.status_code} - {response.text}")
@@ -1268,9 +1291,9 @@ class SAPIntegration:
                                 "OrderEntry": 1236,
                                 "OrderRowID": 0,
                                 "PickedQuantity": 42000.0,
-                                "PickStatus": "ps_Closed",
-                                "ReleasedQuantity": 0.0,
-                                "PreviouslyReleasedQuantity": 42000.0,
+                                "PickStatus": "ps_Released",
+                                "ReleasedQuantity": 42000.0,
+                                "PreviouslyReleasedQuantity": 0.0,
                                 "BaseObjectType": 17,
                                 "SerialNumbers": [],
                                 "BatchNumbers": [],
@@ -1301,9 +1324,9 @@ class SAPIntegration:
                                 "OrderEntry": 1236,
                                 "OrderRowID": 1,
                                 "PickedQuantity": 30000.0,
-                                "PickStatus": "ps_Closed",
-                                "ReleasedQuantity": 0.0,
-                                "PreviouslyReleasedQuantity": 30000.0,
+                                "PickStatus": "ps_Released",
+                                "ReleasedQuantity": 30000.0,
+                                "PreviouslyReleasedQuantity": 0.0,
                                 "BaseObjectType": 17,
                                 "SerialNumbers": [],
                                 "BatchNumbers": [],
@@ -1325,9 +1348,9 @@ class SAPIntegration:
                                 "OrderEntry": 1236,
                                 "OrderRowID": 2,
                                 "PickedQuantity": 50000.0,
-                                "PickStatus": "ps_Closed",
-                                "ReleasedQuantity": 0.0,
-                                "PreviouslyReleasedQuantity": 50000.0,
+                                "PickStatus": "ps_Released",
+                                "ReleasedQuantity": 50000.0,
+                                "PreviouslyReleasedQuantity": 0.0,
                                 "BaseObjectType": 17,
                                 "SerialNumbers": [],
                                 "BatchNumbers": [],
@@ -1487,9 +1510,20 @@ class SAPIntegration:
                 # Then delete pick list lines
                 PickListLine.query.filter_by(pick_list_id=local_pick_list.id).delete(synchronize_session=False)
             
-            # Sync PickListsLines from SAP B1
+            # Sync PickListsLines from SAP B1 - Focus on ps_released, avoid ps_closed
             sap_lines = sap_pick_list.get('PickListsLines', [])
             for sap_line in sap_lines:
+                pick_status = sap_line.get('PickStatus', 'ps_Open')
+                
+                # Skip ps_closed items - only sync ps_released and other active statuses
+                if pick_status == 'ps_Closed':
+                    logging.info(f"⏭️ Skipping ps_Closed line item {sap_line.get('LineNumber', 0)}")
+                    continue
+                
+                # Prefer ps_released items
+                if pick_status == 'ps_Released':
+                    logging.info(f"✅ Syncing ps_Released line item {sap_line.get('LineNumber', 0)}")
+                
                 # Create PickListLine
                 pick_list_line = PickListLine(
                     pick_list_id=local_pick_list.id,
@@ -1498,7 +1532,7 @@ class SAPIntegration:
                     order_entry=sap_line.get('OrderEntry'),
                     order_row_id=sap_line.get('OrderRowID'),
                     picked_quantity=float(sap_line.get('PickedQuantity', 0)),
-                    pick_status=sap_line.get('PickStatus', 'ps_Open'),
+                    pick_status=pick_status,
                     released_quantity=float(sap_line.get('ReleasedQuantity', 0)),
                     previously_released_quantity=float(sap_line.get('PreviouslyReleasedQuantity', 0)),
                     base_object_type=sap_line.get('BaseObjectType', 17),
