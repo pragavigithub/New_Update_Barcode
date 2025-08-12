@@ -96,7 +96,7 @@ if not database_url:
         db_type = "postgresql"
 
 # Final fallback to SQLite
-if not database_url:
+if not app.config.get("SQLALCHEMY_DATABASE_URI"):
     logging.warning("⚠️ No database found, using SQLite fallback")
     sqlite_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'wms.db')
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_path}"
@@ -108,6 +108,10 @@ if not database_url:
     # Ensure instance directory exists
     os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
     logging.info(f"SQLite database path: {sqlite_path}")
+
+# Ensure db_type is always set
+if 'db_type' not in locals():
+    db_type = "sqlite"
 
 # Store database type for use in other modules
 app.config["DB_TYPE"] = db_type
