@@ -647,6 +647,99 @@ BACKUP_PATH=backups/
             """)
             logger.info("✅ Bin locations table created")
 
+        # 15. Bin Items (depends on bin_locations) - Updated to match current models
+        if not self.table_exists('bin_items'):
+            logger.info("Creating bin_items table...")
+            self.execute_query("""
+                CREATE TABLE bin_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    bin_code VARCHAR(100) NOT NULL,
+                    item_code VARCHAR(100) NOT NULL,
+                    item_name VARCHAR(255),
+                    batch_number VARCHAR(100),
+                    quantity DECIMAL(15,3) DEFAULT 0,
+                    available_quantity DECIMAL(15,3) DEFAULT 0,
+                    committed_quantity DECIMAL(15,3) DEFAULT 0,
+                    uom VARCHAR(20) DEFAULT 'EA',
+                    expiry_date DATE,
+                    manufacturing_date DATE,
+                    admission_date DATE,
+                    warehouse_code VARCHAR(50),
+                    sap_abs_entry INT,
+                    sap_system_number INT,
+                    sap_doc_entry INT,
+                    batch_attribute1 VARCHAR(100),
+                    batch_attribute2 VARCHAR(100),
+                    batch_status VARCHAR(50) DEFAULT 'bdsStatus_Released',
+                    last_sap_sync DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (bin_code) REFERENCES bin_locations(bin_code) ON DELETE CASCADE ON UPDATE CASCADE,
+                    INDEX idx_bin_code (bin_code),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_warehouse (warehouse_code),
+                    INDEX idx_batch (batch_number),
+                    INDEX idx_sap_abs_entry (sap_abs_entry)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Bin items table created")
+
+        # 16. Bin Scanning Logs (depends on users and bin_locations)
+        if not self.table_exists('bin_scanning_logs'):
+            logger.info("Creating bin_scanning_logs table...")
+            self.execute_query("""
+                CREATE TABLE bin_scanning_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    bin_code VARCHAR(100) NOT NULL,
+                    user_id INT NOT NULL,
+                    scan_type VARCHAR(50) NOT NULL,
+                    scan_data TEXT,
+                    items_found INT DEFAULT 0,
+                    scan_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    INDEX idx_bin_code (bin_code),
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_scan_timestamp (scan_timestamp),
+                    INDEX idx_scan_type (scan_type)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Bin scanning logs table created")
+
+        # 17. QR Code Labels (depends on users) - Updated to match current models
+        if not self.table_exists('qr_code_labels'):
+            logger.info("Creating qr_code_labels table...")
+            self.execute_query("""
+                CREATE TABLE qr_code_labels (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    label_type VARCHAR(50) NOT NULL,
+                    item_code VARCHAR(100) NOT NULL,
+                    item_name VARCHAR(200),
+                    po_number VARCHAR(100),
+                    batch_number VARCHAR(100),
+                    warehouse_code VARCHAR(50),
+                    bin_code VARCHAR(100),
+                    quantity DECIMAL(15,4),
+                    uom VARCHAR(20),
+                    expiry_date DATE,
+                    qr_content TEXT NOT NULL,
+                    qr_format VARCHAR(20) DEFAULT 'TEXT',
+                    grpo_item_id INT,
+                    inventory_transfer_item_id INT,
+                    user_id INT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (grpo_item_id) REFERENCES grpo_items(id) ON DELETE SET NULL,
+                    FOREIGN KEY (inventory_transfer_item_id) REFERENCES inventory_transfer_items(id) ON DELETE SET NULL,
+                    INDEX idx_label_type (label_type),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_po_number (po_number),
+                    INDEX idx_batch (batch_number),
+                    INDEX idx_warehouse_bin (warehouse_code, bin_code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ QR code labels table created")
+
         # Legacy inventory counting documents for backward compatibility  
         if not self.table_exists('inventory_counting_documents'):
             logger.info("Creating inventory_counting_documents table...")
