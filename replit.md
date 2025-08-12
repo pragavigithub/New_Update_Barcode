@@ -54,6 +54,13 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Integration Focus**: SAP B1 integration with batch management and warehouse operations
 
 ## Recent Changes
+- **2025-08-12**: Successfully completed migration from Replit Agent to standard Replit environment
+- **2025-08-12**: Fixed Pick List database schema issues with comprehensive SQLite migration
+- **2025-08-12**: Added missing columns to pick_lists table: name, remarks, priority, warehouse_code, customer_code, customer_name, total_items, picked_items, notes
+- **2025-08-12**: Configured SESSION_SECRET environment variable for secure session management
+- **2025-08-12**: Verified Pick List allocation details functionality with SAP B1 integration
+- **2025-08-12**: Maintained MySQL migration compatibility while fixing SQLite schema
+- **2025-08-12**: Application running successfully on Replit with dual database support (MySQL priority, SQLite fallback)
 - **2025-08-11**: Fixed pick list line item synchronization from SAP B1 to local database
 - **2025-08-11**: Added sync_pick_list_to_local_db() function for complete PickListsLines and DocumentLinesBinAllocations sync
 - **2025-08-11**: Enhanced pick list detail route to automatically sync SAP B1 data when absolute_entry exists
