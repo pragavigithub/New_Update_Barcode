@@ -190,7 +190,8 @@
                                             <table class="table table-sm table-bordered">
                                                 <thead>
                                                     <tr>
-                                                        <th>Bin Entry</th>
+                                                        <th>Warehouse</th>
+                                                        <th>Bin Code</th>
                                                         <th>Quantity</th>
                                                         <th>Allow Negative</th>
                                                         <th>Base Line</th>
@@ -199,7 +200,8 @@
                                                 <tbody>
                                                     {% for bin_alloc in line.DocumentLinesBinAllocations %}
                                                     <tr>
-                                                        <td><span class="badge bg-primary">{{ bin_alloc.BinAbsEntry }}</span></td>
+                                                        <td><span class="badge bg-info">{{ bin_alloc.Warehouse or 'Unknown' }}</span></td>
+                                                        <td><span class="badge bg-primary">{{ bin_alloc.BinCode or ('Bin-' + bin_alloc.BinAbsEntry|string) }}</span></td>
                                                         <td>{{ "{:,.0f}".format(bin_alloc.Quantity) }}</td>
                                                         <td>
                                                             {% if bin_alloc.AllowNegativeQuantity == 'tNO' %}

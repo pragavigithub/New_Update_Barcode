@@ -1800,54 +1800,27 @@ def import_sap_pick_list(absolute_entry):
 @app.route('/api/lookup-pick-list/<int:absolute_entry>', methods=['GET'])
 @login_required
 def lookup_pick_list_details(absolute_entry):
-    """Lookup Pick List details from SAP B1 by Absolute Entry"""
+    """Lookup Pick List details from SAP B1 by Absolute Entry with enhanced bin location details"""
     try:
         sap = SAPIntegration()
         
-        if sap.ensure_logged_in():
-            try:
-                # Use the URL format from user's SAP B1 data
-                url = f"{sap.base_url}/b1s/v1/PickLists?$filter=Absoluteentry eq {absolute_entry}"
-                response = sap.session.get(url, timeout=15)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    pick_lists = data.get('value', [])
-                    
-                    if pick_lists:
-                        pick_list = pick_lists[0]  # Get the first (should be only) result
-                        logging.info(f"✅ Found Pick List {absolute_entry}: {pick_list.get('Name', 'Unnamed')}")
-                        
-                        return jsonify({
-                            'success': True,
-                            'pick_list': pick_list,
-                            'message': f'Pick List {absolute_entry} found successfully'
-                        })
-                    else:
-                        logging.warning(f"⚠️ Pick List {absolute_entry} not found in SAP B1")
-                        return jsonify({
-                            'success': False,
-                            'message': f'Pick List {absolute_entry} not found in SAP B1'
-                        })
-                        
-                else:
-                    logging.error(f"❌ SAP B1 API error: {response.status_code} - {response.text}")
-                    return jsonify({
-                        'success': False,
-                        'message': f'SAP B1 API error: {response.status_code}'
-                    })
-                    
-            except Exception as e:
-                logging.error(f"❌ Error fetching Pick List from SAP B1: {str(e)}")
-                return jsonify({
-                    'success': False,
-                    'message': f'Error connecting to SAP B1: {str(e)}'
-                })
+        # Use the enhanced get_pick_list_by_id method that includes bin location details
+        result = sap.get_pick_list_by_id(absolute_entry)
+        
+        if result['success']:
+            pick_list = result['pick_list']
+            logging.info(f"✅ Found Pick List {absolute_entry}: {pick_list.get('Name', 'Unnamed')} with enhanced bin details")
+            
+            return jsonify({
+                'success': True,
+                'pick_list': pick_list,
+                'message': f'Pick List {absolute_entry} found successfully with warehouse and bin details'
+            })
         else:
-            logging.warning("⚠️ SAP B1 not available, cannot lookup Pick List")
+            logging.warning(f"⚠️ Pick List {absolute_entry} not found: {result.get('error', 'Unknown error')}")
             return jsonify({
                 'success': False,
-                'message': 'SAP B1 system not available'
+                'message': f"Pick List {absolute_entry} not found: {result.get('error', 'Unknown error')}"
             })
             
     except Exception as e:

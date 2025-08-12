@@ -24,6 +24,7 @@ class SAPIntegration:
         # Cache for frequently accessed data
         self._warehouse_cache = {}
         self._bin_cache = {}
+        self._bin_location_cache = {}  # Cache for BinLocations API
         self._branch_cache = {}
         self._item_cache = {}
         self._batch_cache = {}
@@ -880,6 +881,89 @@ class SAPIntegration:
                 'ManufacturingDate': '2025-01-01'
             }
 
+    def get_bin_location_details(self, bin_abs_entry):
+        """Get warehouse and bin code from BinLocations API by AbsEntry"""
+        try:
+            # Check cache first
+            if bin_abs_entry in self._bin_location_cache:
+                return self._bin_location_cache[bin_abs_entry]
+            
+            if not self.ensure_logged_in():
+                logging.warning("⚠️ SAP B1 not available, returning mock bin location")
+                mock_data = {
+                    'Warehouse': '7000-FG',
+                    'BinCode': f'7000-FG-BIN-{bin_abs_entry}',
+                    'AbsEntry': bin_abs_entry
+                }
+                self._bin_location_cache[bin_abs_entry] = mock_data
+                return mock_data
+            
+            # Use the exact API URL format from user's request
+            url = f"{self.base_url}/b1s/v1/BinLocations?$select=BinCode,Warehouse&$filter=AbsEntry eq {bin_abs_entry}"
+            
+            response = self.session.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                bin_locations = data.get('value', [])
+                
+                if bin_locations:
+                    bin_location = bin_locations[0]
+                    result = {
+                        'Warehouse': bin_location.get('Warehouse', ''),
+                        'BinCode': bin_location.get('BinCode', ''),
+                        'AbsEntry': bin_abs_entry
+                    }
+                    
+                    # Cache the result
+                    self._bin_location_cache[bin_abs_entry] = result
+                    logging.info(f"✅ Found bin location: {result['Warehouse']} - {result['BinCode']}")
+                    return result
+                else:
+                    logging.warning(f"⚠️ Bin location not found for AbsEntry {bin_abs_entry}")
+                    return {
+                        'Warehouse': 'Unknown',
+                        'BinCode': f'Bin-{bin_abs_entry}',
+                        'AbsEntry': bin_abs_entry
+                    }
+            else:
+                logging.error(f"❌ SAP B1 API error getting bin location: {response.status_code}")
+                return {
+                    'Warehouse': 'Error',
+                    'BinCode': f'Bin-{bin_abs_entry}',
+                    'AbsEntry': bin_abs_entry
+                }
+                
+        except Exception as e:
+            logging.error(f"❌ Error getting bin location details: {str(e)}")
+            return {
+                'Warehouse': 'Error',
+                'BinCode': f'Bin-{bin_abs_entry}',
+                'AbsEntry': bin_abs_entry
+            }
+    
+    def enhance_pick_list_with_bin_details(self, pick_list_data):
+        """Enhance pick list data with bin location details (Warehouse and BinCode)"""
+        try:
+            if not pick_list_data or 'PickListsLines' not in pick_list_data:
+                return pick_list_data
+            
+            for line in pick_list_data['PickListsLines']:
+                if 'DocumentLinesBinAllocations' in line and line['DocumentLinesBinAllocations']:
+                    for bin_allocation in line['DocumentLinesBinAllocations']:
+                        bin_abs_entry = bin_allocation.get('BinAbsEntry')
+                        if bin_abs_entry:
+                            bin_details = self.get_bin_location_details(bin_abs_entry)
+                            # Add warehouse and bin code to the bin allocation
+                            bin_allocation['Warehouse'] = bin_details.get('Warehouse', 'Unknown')
+                            bin_allocation['BinCode'] = bin_details.get('BinCode', f'Bin-{bin_abs_entry}')
+            
+            return pick_list_data
+            
+        except Exception as e:
+            logging.error(f"❌ Error enhancing pick list with bin details: {str(e)}")
+            return pick_list_data
+
     def _get_mock_batch_data(self, item_code):
         """Return mock batch data for offline testing"""
         return [{
@@ -1166,19 +1250,18 @@ class SAPIntegration:
             logging.warning("SAP B1 not available, using actual SAP data structure for testing")
             # Use the real SAP structure from your attachment for pick list 613
             if absolute_entry == 613:
-                return {
-                    'success': True,
-                    'pick_list': {
-                        "Absoluteentry": 613,
-                        "Name": "SCM-ORD",
-                        "OwnerCode": 15,
-                        "OwnerName": None,
-                        "PickDate": "2024-02-02T00:00:00Z",
-                        "Remarks": None,
-                        "Status": "ps_Closed",
-                        "ObjectType": "156",
-                        "UseBaseUnits": "tNO",
-                        "PickListsLines": [
+                # Enhanced mock data with warehouse and bin code details
+                mock_pick_list = {
+                    "Absoluteentry": 613,
+                    "Name": "SCM-ORD",
+                    "OwnerCode": 15,
+                    "OwnerName": None,
+                    "PickDate": "2024-02-02T00:00:00Z",
+                    "Remarks": None,
+                    "Status": "ps_Closed",
+                    "ObjectType": "156",
+                    "UseBaseUnits": "tNO",
+                    "PickListsLines": [
                             {
                                 "AbsoluteEntry": 613,
                                 "LineNumber": 0,
@@ -1197,14 +1280,18 @@ class SAPIntegration:
                                         "Quantity": 21000.0,
                                         "AllowNegativeQuantity": "tNO",
                                         "SerialAndBatchNumbersBaseLine": 0,
-                                        "BaseLineNumber": 0
+                                        "BaseLineNumber": 0,
+                                        "Warehouse": "7000-FG",
+                                        "BinCode": "7000-FG-SYSTEM-BIN-LOCATION"
                                     },
                                     {
                                         "BinAbsEntry": 1,
                                         "Quantity": 21000.0,
                                         "AllowNegativeQuantity": "tNO",
                                         "SerialAndBatchNumbersBaseLine": 0,
-                                        "BaseLineNumber": 0
+                                        "BaseLineNumber": 0,
+                                        "Warehouse": "7000-FG",
+                                        "BinCode": "7000-FG-SYSTEM-BIN-LOCATION"
                                     }
                                 ]
                             },
@@ -1226,7 +1313,9 @@ class SAPIntegration:
                                         "Quantity": 1000.0,
                                         "AllowNegativeQuantity": "tNO",
                                         "SerialAndBatchNumbersBaseLine": 0,
-                                        "BaseLineNumber": 1
+                                        "BaseLineNumber": 1,
+                                        "Warehouse": "7000-FG",
+                                        "BinCode": "7000-FG-SYSTEM-BIN-LOCATION"
                                     }
                                 ]
                             },
@@ -1248,12 +1337,19 @@ class SAPIntegration:
                                         "Quantity": 1000.0,
                                         "AllowNegativeQuantity": "tNO",
                                         "SerialAndBatchNumbersBaseLine": 0,
-                                        "BaseLineNumber": 2
+                                        "BaseLineNumber": 2,
+                                        "Warehouse": "7000-FG",
+                                        "BinCode": "7000-FG-SYSTEM-BIN-LOCATION"
                                     }
                                 ]
                             }
                         ]
                     }
+                
+                # Return enhanced mock data
+                return {
+                    'success': True,
+                    'pick_list': mock_pick_list
                 }
             return self._get_mock_pick_list_detail(absolute_entry)
 
@@ -1268,10 +1364,12 @@ class SAPIntegration:
                 pick_lists = data.get('value', [])
                 if pick_lists:
                     pick_list = pick_lists[0]
-                    logging.info(f"✅ Found pick list {absolute_entry} with {len(pick_list.get('PickListsLines', []))} line items")
+                    # Enhance pick list with bin location details (Warehouse and BinCode)
+                    enhanced_pick_list = self.enhance_pick_list_with_bin_details(pick_list)
+                    logging.info(f"✅ Found pick list {absolute_entry} with {len(enhanced_pick_list.get('PickListsLines', []))} line items (enhanced with bin details)")
                     return {
                         'success': True,
-                        'pick_list': pick_list
+                        'pick_list': enhanced_pick_list
                     }
                 else:
                     return {'success': False, 'error': 'Pick list not found'}
