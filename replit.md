@@ -54,6 +54,9 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Integration Focus**: SAP B1 integration with batch management and warehouse operations
 
 ## Recent Changes
+- **2025-08-12**: Fixed Pick List SQLAlchemy join delete error - resolved "Can't call Query.update() or Query.delete() when join() has been called" issue in sync_pick_list_to_local_db function
+- **2025-08-12**: Enhanced database deletion logic to use synchronize_session=False for better performance and MySQL/PostgreSQL compatibility
+- **2025-08-12**: Successfully completed Replit Agent to Replit environment migration with all issues resolved
 - **2025-08-12**: Fixed Pick List Actions button by adding missing viewLineDetails() JavaScript function
 - **2025-08-12**: Enhanced Pick List module to display actual Warehouse and BinCode instead of BinAbsEntry numbers
 - **2025-08-12**: Added get_bin_location_details() function using SAP B1 BinLocations API with exact format: https://192.168.0.153:50000/b1s/v1/BinLocations?$select=BinCode,Warehouse&$filter=AbsEntry eq BinAbsEntry

@@ -1476,11 +1476,16 @@ class SAPIntegration:
         import json
         
         try:
-            # Clear existing lines and bin allocations
-            PickListBinAllocation.query.join(PickListLine).filter(
-                PickListLine.pick_list_id == local_pick_list.id
-            ).delete()
-            PickListLine.query.filter_by(pick_list_id=local_pick_list.id).delete()
+            # Clear existing lines and bin allocations - Fix for SQLAlchemy join delete issue
+            # First get the IDs of bin allocations to delete
+            pick_list_line_ids = [line.id for line in PickListLine.query.filter_by(pick_list_id=local_pick_list.id).all()]
+            
+            if pick_list_line_ids:
+                # Delete bin allocations first (foreign key dependency)
+                PickListBinAllocation.query.filter(PickListBinAllocation.pick_list_line_id.in_(pick_list_line_ids)).delete(synchronize_session=False)
+                
+                # Then delete pick list lines
+                PickListLine.query.filter_by(pick_list_id=local_pick_list.id).delete(synchronize_session=False)
             
             # Sync PickListsLines from SAP B1
             sap_lines = sap_pick_list.get('PickListsLines', [])
