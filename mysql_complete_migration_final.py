@@ -314,182 +314,163 @@ BACKUP_PATH=backups/
             """)
             logger.info("✅ Branches table created")
         
-        # 3. GRPO Documents (depends on users)
+        # 3. GRPO Documents (depends on users) - Updated to match current models
         if not self.table_exists('grpo_documents'):
             logger.info("Creating grpo_documents table...")
             self.execute_query("""
                 CREATE TABLE grpo_documents (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    grpo_number VARCHAR(50) UNIQUE NOT NULL,
-                    po_number VARCHAR(50),
-                    vendor_code VARCHAR(50),
-                    vendor_name VARCHAR(100),
-                    document_date DATE,
-                    posting_date DATE,
-                    due_date DATE,
-                    total_amount DECIMAL(15,2),
-                    currency VARCHAR(10) DEFAULT 'USD',
+                    po_number VARCHAR(20) NOT NULL,
+                    sap_document_number VARCHAR(20),
+                    supplier_code VARCHAR(50),
+                    supplier_name VARCHAR(200),
+                    po_date DATETIME,
+                    po_total DECIMAL(15,2),
                     status VARCHAR(20) DEFAULT 'draft',
-                    warehouse_code VARCHAR(10),
-                    branch_id VARCHAR(10),
-                    user_id INT,
-                    sap_doc_entry INT,
-                    sap_doc_num VARCHAR(20),
-                    remarks TEXT,
+                    user_id INT NOT NULL,
+                    qc_user_id INT,
+                    qc_notes TEXT,
+                    notes TEXT,
+                    draft_or_post VARCHAR(10) DEFAULT 'draft',
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-                    INDEX idx_grpo_number (grpo_number),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (qc_user_id) REFERENCES users(id) ON DELETE SET NULL,
                     INDEX idx_po_number (po_number),
-                    INDEX idx_vendor (vendor_code),
+                    INDEX idx_supplier (supplier_code),
                     INDEX idx_status (status),
-                    INDEX idx_warehouse (warehouse_code),
-                    INDEX idx_sap_doc (sap_doc_entry)
+                    INDEX idx_sap_doc (sap_document_number)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ GRPO documents table created")
         
-        # 4. GRPO Line Items (depends on grpo_documents)
-        if not self.table_exists('grpo_line_items'):
-            logger.info("Creating grpo_line_items table...")
+        # 4. GRPO Items (depends on grpo_documents) - Updated to match current models
+        if not self.table_exists('grpo_items'):
+            logger.info("Creating grpo_items table...")
             self.execute_query("""
-                CREATE TABLE grpo_line_items (
+                CREATE TABLE grpo_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    grpo_id INT NOT NULL,
-                    line_number INT NOT NULL,
-                    item_code VARCHAR(50),
-                    item_description TEXT,
-                    quantity DECIMAL(15,3),
-                    received_quantity DECIMAL(15,3) DEFAULT 0,
+                    grpo_document_id INT NOT NULL,
+                    po_line_number INT,
+                    item_code VARCHAR(50) NOT NULL,
+                    item_name VARCHAR(200) NOT NULL,
+                    po_quantity DECIMAL(15,3),
+                    open_quantity DECIMAL(15,3),
+                    received_quantity DECIMAL(15,3) NOT NULL,
+                    unit_of_measure VARCHAR(10) NOT NULL,
                     unit_price DECIMAL(15,4),
-                    line_total DECIMAL(15,2),
-                    warehouse_code VARCHAR(10),
-                    bin_location VARCHAR(50),
+                    bin_location VARCHAR(20) NOT NULL,
                     batch_number VARCHAR(50),
-                    serial_numbers TEXT,
-                    expiry_date DATE,
-                    manufacturing_date DATE,
-                    quality_status VARCHAR(20) DEFAULT 'pending',
-                    remarks TEXT,
-                    sap_line_num INT,
+                    serial_number VARCHAR(50),
+                    expiration_date DATETIME,
+                    supplier_barcode VARCHAR(100),
+                    generated_barcode VARCHAR(100),
+                    barcode_printed BOOLEAN DEFAULT FALSE,
+                    qc_status VARCHAR(20) DEFAULT 'pending',
+                    qc_notes TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    FOREIGN KEY (grpo_id) REFERENCES grpo_documents(id) ON DELETE CASCADE,
-                    INDEX idx_grpo_line (grpo_id, line_number),
+                    FOREIGN KEY (grpo_document_id) REFERENCES grpo_documents(id) ON DELETE CASCADE,
+                    INDEX idx_grpo_item (grpo_document_id),
                     INDEX idx_item_code (item_code),
-                    INDEX idx_warehouse_bin (warehouse_code, bin_location),
+                    INDEX idx_bin_location (bin_location),
                     INDEX idx_batch (batch_number),
-                    INDEX idx_quality (quality_status)
+                    INDEX idx_qc_status (qc_status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ GRPO line items table created")
         
-        # 5. Inventory Transfer Documents (depends on users)
-        if not self.table_exists('inventory_transfer_documents'):
-            logger.info("Creating inventory_transfer_documents table...")
+        # 5. Inventory Transfers (depends on users) - Updated to match current models
+        if not self.table_exists('inventory_transfers'):
+            logger.info("Creating inventory_transfers table...")
             self.execute_query("""
-                CREATE TABLE inventory_transfer_documents (
+                CREATE TABLE inventory_transfers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    transfer_number VARCHAR(50) UNIQUE NOT NULL,
-                    from_warehouse VARCHAR(10),
-                    to_warehouse VARCHAR(10),
-                    transfer_date DATE,
-                    posting_date DATE,
+                    transfer_request_number VARCHAR(20) NOT NULL,
+                    sap_document_number VARCHAR(20),
                     status VARCHAR(20) DEFAULT 'draft',
-                    total_items INT DEFAULT 0,
-                    transferred_items INT DEFAULT 0,
-                    user_id INT,
-                    approved_by_id INT,
-                    approved_at DATETIME,
-                    sap_doc_entry INT,
-                    sap_doc_num VARCHAR(20),
-                    remarks TEXT,
+                    user_id INT NOT NULL,
+                    qc_approver_id INT,
+                    qc_approved_at DATETIME,
+                    qc_notes TEXT,
+                    from_warehouse VARCHAR(20),
+                    to_warehouse VARCHAR(20),
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-                    FOREIGN KEY (approved_by_id) REFERENCES users(id) ON DELETE SET NULL,
-                    INDEX idx_transfer_number (transfer_number),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (qc_approver_id) REFERENCES users(id) ON DELETE SET NULL,
+                    INDEX idx_transfer_number (transfer_request_number),
                     INDEX idx_warehouses (from_warehouse, to_warehouse),
                     INDEX idx_status (status),
-                    INDEX idx_transfer_date (transfer_date),
-                    INDEX idx_sap_doc (sap_doc_entry)
+                    INDEX idx_sap_doc (sap_document_number)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ Inventory transfer documents table created")
         
-        # 6. Inventory Transfer Line Items (depends on inventory_transfer_documents)
-        if not self.table_exists('inventory_transfer_line_items'):
-            logger.info("Creating inventory_transfer_line_items table...")
+        # 6. Inventory Transfer Items (depends on inventory_transfers) - Updated to match current models
+        if not self.table_exists('inventory_transfer_items'):
+            logger.info("Creating inventory_transfer_items table...")
             self.execute_query("""
-                CREATE TABLE inventory_transfer_line_items (
+                CREATE TABLE inventory_transfer_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    transfer_id INT NOT NULL,
-                    line_number INT NOT NULL,
-                    item_code VARCHAR(50),
-                    item_description TEXT,
-                    quantity DECIMAL(15,3),
+                    inventory_transfer_id INT NOT NULL,
+                    item_code VARCHAR(50) NOT NULL,
+                    item_name VARCHAR(200) NOT NULL,
+                    quantity DECIMAL(15,3) NOT NULL,
+                    requested_quantity DECIMAL(15,3) NOT NULL,
                     transferred_quantity DECIMAL(15,3) DEFAULT 0,
-                    from_warehouse VARCHAR(10),
-                    to_warehouse VARCHAR(10),
+                    remaining_quantity DECIMAL(15,3) NOT NULL,
+                    unit_of_measure VARCHAR(10) NOT NULL,
+                    from_bin VARCHAR(20),
+                    to_bin VARCHAR(20),
                     from_bin_location VARCHAR(50),
                     to_bin_location VARCHAR(50),
                     batch_number VARCHAR(50),
-                    serial_numbers TEXT,
-                    expiry_date DATE,
-                    manufacturing_date DATE,
-                    unit_cost DECIMAL(15,4),
-                    line_total DECIMAL(15,2),
-                    status VARCHAR(20) DEFAULT 'pending',
-                    remarks TEXT,
-                    sap_line_num INT,
+                    available_batches TEXT,
+                    qc_status VARCHAR(20) DEFAULT 'pending',
+                    qc_notes TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    FOREIGN KEY (transfer_id) REFERENCES inventory_transfer_documents(id) ON DELETE CASCADE,
-                    INDEX idx_transfer_line (transfer_id, line_number),
+                    FOREIGN KEY (inventory_transfer_id) REFERENCES inventory_transfers(id) ON DELETE CASCADE,
+                    INDEX idx_transfer_item (inventory_transfer_id),
                     INDEX idx_item_code (item_code),
-                    INDEX idx_warehouses (from_warehouse, to_warehouse),
                     INDEX idx_bins (from_bin_location, to_bin_location),
                     INDEX idx_batch (batch_number),
-                    INDEX idx_status (status)
+                    INDEX idx_qc_status (qc_status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ Inventory transfer line items table created")
         
-        # 7. Pick Lists (depends on users) - SAP B1 Compatible
+        # 7. Pick Lists (depends on users) - Updated to match current models
         if not self.table_exists('pick_lists'):
             logger.info("Creating pick_lists table...")
             self.execute_query("""
                 CREATE TABLE pick_lists (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    absolute_entry INT UNIQUE,
-                    name VARCHAR(100),
+                    absolute_entry INT,
+                    name VARCHAR(50) NOT NULL,
                     owner_code INT,
                     owner_name VARCHAR(100),
-                    pick_date DATE,
-                    status VARCHAR(20) DEFAULT 'ps_Open',
+                    pick_date DATETIME,
+                    remarks TEXT,
+                    status VARCHAR(20) DEFAULT 'pending',
                     object_type VARCHAR(10) DEFAULT '156',
-                    use_base_units VARCHAR(10) DEFAULT 'tNO',
-                    pick_list_number VARCHAR(50),
-                    sales_order_number VARCHAR(50),
-                    customer_code VARCHAR(50),
-                    customer_name VARCHAR(100),
+                    use_base_units VARCHAR(5) DEFAULT 'tNO',
+                    sales_order_number VARCHAR(20),
+                    pick_list_number VARCHAR(20),
+                    user_id INT NOT NULL,
+                    approver_id INT,
+                    priority VARCHAR(10) DEFAULT 'normal',
                     warehouse_code VARCHAR(10),
-                    priority VARCHAR(20) DEFAULT 'normal',
+                    customer_code VARCHAR(20),
+                    customer_name VARCHAR(100),
                     total_items INT DEFAULT 0,
                     picked_items INT DEFAULT 0,
-                    user_id INT,
-                    approved_by_id INT,
-                    approved_at DATETIME,
-                    completed_at DATETIME,
-                    remarks TEXT,
                     notes TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-                    FOREIGN KEY (approved_by_id) REFERENCES users(id) ON DELETE SET NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (approver_id) REFERENCES users(id) ON DELETE SET NULL,
                     INDEX idx_absolute_entry (absolute_entry),
-                    INDEX idx_pick_list_number (pick_list_number),
-                    INDEX idx_sales_order (sales_order_number),
+                    INDEX idx_name (name),
                     INDEX idx_status (status),
                     INDEX idx_priority (priority),
                     INDEX idx_customer (customer_code),
@@ -499,7 +480,31 @@ BACKUP_PATH=backups/
             """)
             logger.info("✅ Pick lists table created")
         
-        # 8. Pick List Lines (depends on pick_lists) - SAP B1 Compatible
+        # 8. Pick List Items (depends on pick_lists) - Legacy compatibility
+        if not self.table_exists('pick_list_items'):
+            logger.info("Creating pick_list_items table...")
+            self.execute_query("""
+                CREATE TABLE pick_list_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    pick_list_id INT NOT NULL,
+                    item_code VARCHAR(50) NOT NULL,
+                    item_name VARCHAR(200) NOT NULL,
+                    quantity DECIMAL(15,3) NOT NULL,
+                    picked_quantity DECIMAL(15,3) DEFAULT 0,
+                    unit_of_measure VARCHAR(10) NOT NULL,
+                    bin_location VARCHAR(20) NOT NULL,
+                    batch_number VARCHAR(50),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (pick_list_id) REFERENCES pick_lists(id) ON DELETE CASCADE,
+                    INDEX idx_pick_list (pick_list_id),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_bin_location (bin_location),
+                    INDEX idx_batch (batch_number)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Pick list items table created")
+        
+        # 9. Pick List Lines (depends on pick_lists) - Updated to match current models
         if not self.table_exists('pick_list_lines'):
             logger.info("Creating pick_list_lines table...")
             self.execute_query("""
@@ -510,36 +515,29 @@ BACKUP_PATH=backups/
                     line_number INT NOT NULL,
                     order_entry INT,
                     order_row_id INT,
-                    item_code VARCHAR(50),
-                    item_description TEXT,
                     picked_quantity DECIMAL(15,3) DEFAULT 0,
                     pick_status VARCHAR(20) DEFAULT 'ps_Open',
                     released_quantity DECIMAL(15,3) DEFAULT 0,
                     previously_released_quantity DECIMAL(15,3) DEFAULT 0,
                     base_object_type INT DEFAULT 17,
-                    warehouse_code VARCHAR(10),
-                    bin_location VARCHAR(50),
-                    batch_number VARCHAR(50),
+                    item_code VARCHAR(50),
+                    item_name VARCHAR(200),
+                    unit_of_measure VARCHAR(10),
                     serial_numbers TEXT,
                     batch_numbers TEXT,
-                    unit_price DECIMAL(15,4),
-                    line_total DECIMAL(15,2),
-                    remarks TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (pick_list_id) REFERENCES pick_lists(id) ON DELETE CASCADE,
                     INDEX idx_pick_list_line (pick_list_id, line_number),
                     INDEX idx_absolute_entry (absolute_entry),
                     INDEX idx_order_entry (order_entry, order_row_id),
                     INDEX idx_item_code (item_code),
-                    INDEX idx_pick_status (pick_status),
-                    INDEX idx_warehouse_bin (warehouse_code, bin_location),
-                    INDEX idx_batch (batch_number)
+                    INDEX idx_pick_status (pick_status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ Pick list lines table created")
         
-        # 9. Pick List Bin Allocations (depends on pick_list_lines) - SAP B1 Compatible
+
+        # 10. Pick List Bin Allocations (depends on pick_list_lines) - Updated to match current models  
         if not self.table_exists('pick_list_bin_allocations'):
             logger.info("Creating pick_list_bin_allocations table...")
             self.execute_query("""
@@ -547,27 +545,109 @@ BACKUP_PATH=backups/
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     pick_list_line_id INT NOT NULL,
                     bin_abs_entry INT,
-                    quantity DECIMAL(15,3),
-                    allow_negative_quantity VARCHAR(10) DEFAULT 'tNO',
+                    quantity DECIMAL(15,3) NOT NULL,
+                    allow_negative_quantity VARCHAR(5) DEFAULT 'tNO',
                     serial_and_batch_numbers_base_line INT DEFAULT 0,
-                    base_line_number INT DEFAULT 0,
-                    warehouse VARCHAR(20),
-                    bin_code VARCHAR(50),
-                    batch_number VARCHAR(50),
-                    serial_number VARCHAR(50),
+                    base_line_number INT,
+                    bin_code VARCHAR(20),
+                    bin_location VARCHAR(50),
+                    warehouse_code VARCHAR(10),
+                    picked_quantity DECIMAL(15,3) DEFAULT 0,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (pick_list_line_id) REFERENCES pick_list_lines(id) ON DELETE CASCADE,
                     INDEX idx_pick_list_line (pick_list_line_id),
                     INDEX idx_bin_abs_entry (bin_abs_entry),
-                    INDEX idx_warehouse_bin (warehouse, bin_code),
-                    INDEX idx_batch (batch_number),
-                    INDEX idx_serial (serial_number)
+                    INDEX idx_warehouse_bin (warehouse_code, bin_code)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ Pick list bin allocations table created")
-        
-        # 10. Inventory Counting Documents (depends on users)
+
+        # 11. Inventory Counts (depends on users) - Updated to match current models
+        if not self.table_exists('inventory_counts'):
+            logger.info("Creating inventory_counts table...")
+            self.execute_query("""
+                CREATE TABLE inventory_counts (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    count_number VARCHAR(20) NOT NULL,
+                    warehouse_code VARCHAR(10) NOT NULL,
+                    bin_location VARCHAR(20) NOT NULL,
+                    status VARCHAR(20) DEFAULT 'assigned',
+                    user_id INT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    INDEX idx_count_number (count_number),
+                    INDEX idx_warehouse (warehouse_code),
+                    INDEX idx_bin_location (bin_location),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Inventory counts table created")
+
+        # 12. Inventory Count Items (depends on inventory_counts)
+        if not self.table_exists('inventory_count_items'):
+            logger.info("Creating inventory_count_items table...")
+            self.execute_query("""
+                CREATE TABLE inventory_count_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    inventory_count_id INT NOT NULL,
+                    item_code VARCHAR(50) NOT NULL,
+                    item_name VARCHAR(200) NOT NULL,
+                    system_quantity DECIMAL(15,3) NOT NULL,
+                    counted_quantity DECIMAL(15,3) NOT NULL,
+                    variance DECIMAL(15,3) NOT NULL,
+                    unit_of_measure VARCHAR(10) NOT NULL,
+                    batch_number VARCHAR(50),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (inventory_count_id) REFERENCES inventory_counts(id) ON DELETE CASCADE,
+                    INDEX idx_inventory_count (inventory_count_id),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_batch (batch_number)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Inventory count items table created")
+
+        # 13. Barcode Labels
+        if not self.table_exists('barcode_labels'):
+            logger.info("Creating barcode_labels table...")
+            self.execute_query("""
+                CREATE TABLE barcode_labels (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    item_code VARCHAR(50) NOT NULL,
+                    barcode VARCHAR(100) NOT NULL,
+                    label_format VARCHAR(20) NOT NULL,
+                    print_count INT DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_printed DATETIME,
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_barcode (barcode)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Barcode labels table created")
+
+        # 14. Bin Locations
+        if not self.table_exists('bin_locations'):
+            logger.info("Creating bin_locations table...")
+            self.execute_query("""
+                CREATE TABLE bin_locations (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    bin_code VARCHAR(100) UNIQUE NOT NULL,
+                    warehouse_code VARCHAR(50) NOT NULL,
+                    description VARCHAR(255),
+                    is_active BOOLEAN DEFAULT TRUE,
+                    is_system_bin BOOLEAN DEFAULT FALSE,
+                    sap_abs_entry INT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_bin_code (bin_code),
+                    INDEX idx_warehouse (warehouse_code),
+                    INDEX idx_active (is_active),
+                    INDEX idx_sap_abs_entry (sap_abs_entry)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Bin locations table created")
+
+        # Legacy inventory counting documents for backward compatibility  
         if not self.table_exists('inventory_counting_documents'):
             logger.info("Creating inventory_counting_documents table...")
             self.execute_query("""
