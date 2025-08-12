@@ -54,6 +54,11 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Integration Focus**: SAP B1 integration with batch management and warehouse operations
 
 ## Recent Changes
+- **2025-08-12**: Fixed Pick List Actions button by adding missing viewLineDetails() JavaScript function
+- **2025-08-12**: Enhanced Pick List module to display actual Warehouse and BinCode instead of BinAbsEntry numbers
+- **2025-08-12**: Added get_bin_location_details() function using SAP B1 BinLocations API with exact format: https://192.168.0.153:50000/b1s/v1/BinLocations?$select=BinCode,Warehouse&$filter=AbsEntry eq BinAbsEntry
+- **2025-08-12**: Updated Pick List template to show "Warehouse" and "Bin Code" columns with enhanced data
+- **2025-08-12**: Implemented bin location caching for improved performance in SAP B1 integration
 - **2025-08-12**: Successfully completed migration from Replit Agent to standard Replit environment
 - **2025-08-12**: Fixed Pick List database schema issues with comprehensive SQLite migration
 - **2025-08-12**: Added missing columns to pick_lists table: name, remarks, priority, warehouse_code, customer_code, customer_name, total_items, picked_items, notes

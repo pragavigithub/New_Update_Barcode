@@ -477,6 +477,23 @@ async function rejectPickList(pickListId) {
     }
 }
 
+// View line details function
+function viewLineDetails(lineNumber) {
+    // Toggle the bin details collapse for this line
+    const binDetailsId = `#binDetails${lineNumber}`;
+    const binDetailsElement = document.querySelector(binDetailsId);
+    
+    if (binDetailsElement) {
+        // Use Bootstrap's collapse functionality
+        const collapse = new bootstrap.Collapse(binDetailsElement, {
+            toggle: true
+        });
+    } else {
+        // If no bin details available, show a simple alert
+        alert(`Line ${lineNumber} details: No bin allocation details available for this line.`);
+    }
+}
+
 // Form submission
 document.getElementById('addPickItemForm').addEventListener('submit', function(e) {
     e.preventDefault();
