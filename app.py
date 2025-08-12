@@ -151,6 +151,8 @@ with app.app_context():
             default_branch = Branch()
             default_branch.id = 'BR001'
             default_branch.name = 'Main Branch'
+            default_branch.branch_code = 'BR001'  # Required field
+            default_branch.branch_name = 'Main Branch'  # Required field
             default_branch.description = 'Main Office Branch'
             default_branch.address = 'Main Office'
             default_branch.phone = '123-456-7890'
