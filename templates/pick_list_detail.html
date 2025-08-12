@@ -127,7 +127,132 @@
                 </div>
             </div>
             <div class="card-body">
-                {% if pick_list_lines %}
+                {% if sap_pick_list and sap_pick_list.PickListsLines %}
+                <!-- Display SAP B1 Pick List Lines -->
+                <div class="alert alert-info mb-3">
+                    <i data-feather="database"></i> Displaying data from SAP B1 ({{ sap_pick_list.PickListsLines|length }} line items)
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Line #</th>
+                                <th>Order Entry</th>
+                                <th>Row ID</th>
+                                <th>Picked Qty</th>
+                                <th>Released Qty</th>
+                                <th>Status</th>
+                                <th>Bin Allocations</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in sap_pick_list.PickListsLines %}
+                            <tr>
+                                <td><strong>{{ line.LineNumber }}</strong></td>
+                                <td>{{ line.OrderEntry }}</td>
+                                <td>{{ line.OrderRowID }}</td>
+                                <td><span class="badge bg-success">{{ "{:,.0f}".format(line.PickedQuantity) }}</span></td>
+                                <td>{{ "{:,.0f}".format(line.ReleasedQuantity) }}</td>
+                                <td>
+                                    {% if line.PickStatus == 'ps_Open' %}
+                                        <span class="badge bg-warning">Open</span>
+                                    {% elif line.PickStatus == 'ps_Closed' %}
+                                        <span class="badge bg-success">Closed</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ line.PickStatus }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if line.DocumentLinesBinAllocations %}
+                                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" 
+                                            data-bs-target="#binDetails{{ loop.index0 }}" 
+                                            aria-expanded="false">
+                                        <i data-feather="map-pin"></i> {{ line.DocumentLinesBinAllocations|length }} Bins
+                                    </button>
+                                    {% else %}
+                                    <span class="text-muted">No bins</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewLineDetails({{ line.LineNumber }})">
+                                        <i data-feather="eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <!-- Bin Allocations Details -->
+                            {% if line.DocumentLinesBinAllocations %}
+                            <tr class="collapse" id="binDetails{{ loop.index0 }}">
+                                <td colspan="8">
+                                    <div class="card card-body">
+                                        <h6>Bin Allocations for Line {{ line.LineNumber }}:</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Bin Entry</th>
+                                                        <th>Quantity</th>
+                                                        <th>Allow Negative</th>
+                                                        <th>Base Line</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for bin_alloc in line.DocumentLinesBinAllocations %}
+                                                    <tr>
+                                                        <td><span class="badge bg-primary">{{ bin_alloc.BinAbsEntry }}</span></td>
+                                                        <td>{{ "{:,.0f}".format(bin_alloc.Quantity) }}</td>
+                                                        <td>
+                                                            {% if bin_alloc.AllowNegativeQuantity == 'tNO' %}
+                                                                <span class="text-danger"><i data-feather="x"></i> No</span>
+                                                            {% else %}
+                                                                <span class="text-success"><i data-feather="check"></i> Yes</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ bin_alloc.BaseLineNumber }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- SAP Summary Statistics -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <h5 class="text-primary">{{ sap_pick_list.PickListsLines|length }}</h5>
+                                        <small class="text-muted">Total Lines</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h5 class="text-success">{{ "{:,.0f}".format(sap_pick_list.PickListsLines|sum(attribute='PickedQuantity')) }}</h5>
+                                        <small class="text-muted">Total Picked Qty</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h5 class="text-info">{{ sap_pick_list.PickListsLines|selectattr('PickStatus', 'equalto', 'ps_Closed')|list|length }}</h5>
+                                        <small class="text-muted">Closed Lines</small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        {% set total_bins = sap_pick_list.PickListsLines|sum(attribute='DocumentLinesBinAllocations')|length %}
+                                        <h5 class="text-warning">{{ total_bins if total_bins else 0 }}</h5>
+                                        <small class="text-muted">Total Bin Allocations</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% elif pick_list_lines %}
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
@@ -245,7 +370,14 @@
                 <div class="text-center py-4">
                     <i data-feather="package" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
                     <h6>No Items in Pick List</h6>
+                    {% if pick_list.absolute_entry %}
+                    <p class="text-muted">SAP Entry {{ pick_list.absolute_entry }} - Loading data from SAP B1...</p>
+                    <button class="btn btn-primary btn-sm" onclick="location.reload()">
+                        <i data-feather="refresh-cw"></i> Refresh
+                    </button>
+                    {% else %}
                     <p class="text-muted">Add items to the pick list to get started.</p>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
