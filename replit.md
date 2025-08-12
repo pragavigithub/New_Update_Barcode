@@ -54,6 +54,12 @@ A comprehensive warehouse management system with SAP B1 integration, built with 
 - **Integration Focus**: SAP B1 integration with batch management and warehouse operations
 
 ## Recent Changes
+- **2025-08-12**: Enhanced Pick List module with comprehensive pagination, search, and rows per page functionality matching Bin Scan module patterns
+- **2025-08-12**: Added filter dropdowns for status and priority with real-time filtering capabilities
+- **2025-08-12**: Implemented SAP B1 sync and export buttons for Pick List management
+- **2025-08-12**: Enhanced Pick List table with Name column and improved status display for SAP integration
+- **2025-08-12**: Added per_page parameter support in routes.py for configurable rows per page (5, 10, 25, 50, 100)
+- **2025-08-12**: Implemented comprehensive pagination controls with page navigation and entry count display
 - **2025-08-12**: Fixed Pick List SQLAlchemy join delete error - resolved "Can't call Query.update() or Query.delete() when join() has been called" issue in sync_pick_list_to_local_db function
 - **2025-08-12**: Enhanced database deletion logic to use synchronize_session=False for better performance and MySQL/PostgreSQL compatibility
 - **2025-08-12**: Successfully completed Replit Agent to Replit environment migration with all issues resolved

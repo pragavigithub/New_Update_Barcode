@@ -1398,7 +1398,7 @@ def pick_list():
     status_filter = request.args.get('status', 'all')
     priority_filter = request.args.get('priority', 'all')
     page = request.args.get('page', 1, type=int)
-    per_page = 10
+    per_page = request.args.get('per_page', 10, type=int)
     
     # Start with base query
     query = PickList.query
@@ -1452,6 +1452,7 @@ def pick_list():
                          search_query=search_query,
                          status_filter=status_filter,
                          priority_filter=priority_filter,
+                         per_page=per_page,
                          sap_count=sap_count)
 
 @app.route('/pick_list/<int:pick_list_id>')
