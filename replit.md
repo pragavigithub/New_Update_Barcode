@@ -30,6 +30,8 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - **2025-08-13**: Fixed QR code generation issue by adding missing column detection
 - Added comprehensive column migration for `qr_code_labels` table including `item_name`, `po_number`, `bin_code`
 - Migration file now handles existing databases with missing columns automatically
+- Fixed legacy MySQL fields `label_number` and `qr_code_data` that were causing NOT NULL constraint errors
+- Updated migration to handle all legacy QR code table schemas from previous implementations
 
 ## User Preferences
 - None specified yet

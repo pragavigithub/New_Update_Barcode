@@ -254,26 +254,31 @@ BACKUP_PATH=backups/
         if self.table_exists('qr_code_labels'):
             logger.info("🔍 Checking QR code labels table for missing columns...")
             
-            # First handle the problematic label_number field if it exists without a default
-            try:
-                if self.column_exists('qr_code_labels', 'label_number'):
-                    logger.info("⚠️ Found existing label_number column, fixing to allow NULL or have default...")
-                    # Try to make it nullable first, then add a default
-                    self.execute_query("ALTER TABLE qr_code_labels MODIFY COLUMN label_number VARCHAR(50) NULL")
-                    self.execute_query("ALTER TABLE qr_code_labels ALTER COLUMN label_number SET DEFAULT NULL")
-                    logger.info("✅ Fixed label_number column to be nullable")
-                else:
-                    # Add label_number if it doesn't exist (for compatibility)
-                    self.execute_query("ALTER TABLE qr_code_labels ADD COLUMN label_number VARCHAR(50) NULL")
-                    logger.info("✅ Added label_number column for backward compatibility")
-            except Exception as e:
-                logger.warning(f"⚠️ Could not fix label_number column: {e}")
-                # If all else fails, try to drop the NOT NULL constraint
+            # Handle legacy fields that exist in MySQL but not in current models
+            legacy_fields = [
+                ('label_number', 'VARCHAR(50)', 'NULL'),
+                ('qr_code_data', 'TEXT', 'NULL'),  # This is causing the current error
+            ]
+            
+            for field_name, field_type, default_value in legacy_fields:
                 try:
-                    self.execute_query("ALTER TABLE qr_code_labels MODIFY COLUMN label_number VARCHAR(50)")
-                    logger.info("✅ Removed NOT NULL constraint from label_number column")
-                except Exception as e2:
-                    logger.error(f"❌ Could not fix label_number column at all: {e2}")
+                    if self.column_exists('qr_code_labels', field_name):
+                        logger.info(f"⚠️ Found existing {field_name} column, fixing to allow NULL...")
+                        # Make the field nullable with default
+                        self.execute_query(f"ALTER TABLE qr_code_labels MODIFY COLUMN {field_name} {field_type} DEFAULT {default_value}")
+                        logger.info(f"✅ Fixed {field_name} column to be nullable with default")
+                    else:
+                        # Add the field if it doesn't exist (for compatibility)
+                        self.execute_query(f"ALTER TABLE qr_code_labels ADD COLUMN {field_name} {field_type} DEFAULT {default_value}")
+                        logger.info(f"✅ Added {field_name} column for backward compatibility")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not fix {field_name} column: {e}")
+                    # If all else fails, try to just make it nullable
+                    try:
+                        self.execute_query(f"ALTER TABLE qr_code_labels MODIFY COLUMN {field_name} {field_type}")
+                        logger.info(f"✅ Made {field_name} column nullable")
+                    except Exception as e2:
+                        logger.error(f"❌ Could not fix {field_name} column at all: {e2}")
             
             qr_code_columns = [
                 ('item_name', 'VARCHAR(200)'),
@@ -781,6 +786,7 @@ BACKUP_PATH=backups/
                 CREATE TABLE qr_code_labels (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     label_number VARCHAR(50) NULL,
+                    qr_code_data TEXT NULL,
                     label_type VARCHAR(50) NOT NULL,
                     item_code VARCHAR(100) NOT NULL,
                     item_name VARCHAR(200),
