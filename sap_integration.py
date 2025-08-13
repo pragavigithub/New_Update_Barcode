@@ -966,25 +966,7 @@ class SAPIntegration:
 
     def _get_mock_batch_data(self, item_code):
         """Return mock batch data for offline testing"""
-        return [{
-            'BatchNumber': 'A22',
-            'OnHandQuantity': 66.0,
-            'ExpiryDate': '2025-12-31T00:00:00Z',
-            'ManufacturingDate': '2025-01-01T00:00:00Z',
-            'Warehouse': 'ORD-CHN'
-        }, {
-            'BatchNumber': 'B23',
-            'OnHandQuantity': 45.0,
-            'ExpiryDate': '2026-06-30T00:00:00Z',
-            'ManufacturingDate': '2025-06-01T00:00:00Z',
-            'Warehouse': 'ORD-CHN'
-        }, {
-            'BatchNumber': 'C24',
-            'OnHandQuantity': 32.0,
-            'ExpiryDate': '2026-12-31T00:00:00Z',
-            'ManufacturingDate': '2025-12-01T00:00:00Z',
-            'Warehouse': 'ORD-CHN'
-        }]
+        return []
 
     def create_inventory_transfer(self, transfer_document):
         """Create Stock Transfer in SAP B1 with correct JSON structure"""
@@ -2076,8 +2058,8 @@ class SAPIntegration:
         po_doc_entry = po_data.get('DocEntry')
 
         # Use PO dates in correct format (YYYY-MM-DD, not with time)
-        doc_date = po_data.get('DocDate', '2024-02-24')
-        doc_due_date = po_data.get('DocDueDate', '2024-03-05')
+        doc_date = po_data.get('DocDate', datetime.now().strftime('%Y-%m-%d'))
+        doc_due_date = po_data.get('DocDueDate', datetime.now().strftime('%Y-%m-%d'))
 
         # Ensure dates are in YYYY-MM-DD format (remove time if present)
         if 'T' in doc_date:
