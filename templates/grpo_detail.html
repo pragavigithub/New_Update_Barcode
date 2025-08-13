@@ -98,22 +98,33 @@
                                     <td>
                                         {% if po_item.get('LineStatus') == 'bost_Open' %}
                                             <span class="badge bg-success">Open</span>
+                                        {% elif po_item.get('LineStatus') == 'bost_Close' %}
+                                            <span class="badge bg-secondary">Closed</span>
                                         {% else %}
-                                            <span class="badge bg-secondary">{{ po_item.get('LineStatus', 'Unknown') }}</span>
+                                            <span class="badge bg-warning">{{ po_item.get('LineStatus', 'Unknown') }}</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-primary add-item-btn"
-                                                data-item-code="{{ po_item.get('ItemCode', '') }}"
-                                                data-item-name="{{ po_item.get('ItemDescription', 'N/A') }}"
-                                                data-uom="{{ po_item.get('UoMCode', po_item.get('UoMEntry', 'EA')) }}"
-                                                data-warehouse="{{ po_item.get('WarehouseCode', 'WH001') }}"
-                                                data-po-item="{{ po_item|tojson|e }}"
-                                                data-ordered-qty="{{ po_item.get('Quantity', 0) }}"
-                                                data-open-qty="{{ po_item.get('OpenQuantity', po_item.get('OpenQty', 0)) }}"
-                                                data-line-status="{{ po_item.get('LineStatus', '') }}">
-                                            <i data-feather="plus"></i> Add Item
-                                        </button>
+                                        {% if po_item.get('LineStatus') == 'bost_Close' %}
+                                            <!-- Disabled button for closed items -->
+                                            <button class="btn btn-sm btn-secondary add-item-btn" disabled
+                                                    title="Cannot add items from closed PO lines">
+                                                <i data-feather="x"></i> Closed
+                                            </button>
+                                        {% else %}
+                                            <!-- Enabled button for open items -->
+                                            <button class="btn btn-sm btn-primary add-item-btn"
+                                                    data-item-code="{{ po_item.get('ItemCode', '') }}"
+                                                    data-item-name="{{ po_item.get('ItemDescription', 'N/A') }}"
+                                                    data-uom="{{ po_item.get('UoMCode', po_item.get('UoMEntry', 'EA')) }}"
+                                                    data-warehouse="{{ po_item.get('WarehouseCode', 'WH001') }}"
+                                                    data-po-item="{{ po_item|tojson|e }}"
+                                                    data-ordered-qty="{{ po_item.get('Quantity', 0) }}"
+                                                    data-open-qty="{{ po_item.get('OpenQuantity', po_item.get('OpenQty', 0)) }}"
+                                                    data-line-status="{{ po_item.get('LineStatus', '') }}">
+                                                <i data-feather="plus"></i> Add Item
+                                            </button>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -141,9 +152,15 @@
                             <i data-feather="check-square"></i> 
                             Received Items
                         </h6>
+                        {% if grpo_doc.status in ['draft', 'rejected'] %}
                         <button class="btn btn-success btn-sm" onclick="showAddItemModal()">
                             <i data-feather="plus"></i> Add Item
                         </button>
+                        {% else %}
+                        <button class="btn btn-secondary btn-sm" disabled title="Cannot add items to {{ grpo_doc.status }} GRPO">
+                            <i data-feather="lock"></i> Add Item
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card-body">

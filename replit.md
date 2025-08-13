@@ -32,6 +32,8 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - Migration file now handles existing databases with missing columns automatically
 - Fixed legacy MySQL fields `label_number` and `qr_code_data` that were causing NOT NULL constraint errors
 - Updated migration to handle all legacy QR code table schemas from previous implementations
+- Enhanced GRPO module: "+Add Item" buttons are now disabled for closed PO lines and enabled for open lines
+- Added status-based button management for better user experience and data integrity
 
 ## User Preferences
 - None specified yet
