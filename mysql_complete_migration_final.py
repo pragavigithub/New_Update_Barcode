@@ -253,6 +253,28 @@ BACKUP_PATH=backups/
         # CRITICAL: Check QR Code Labels table for missing columns
         if self.table_exists('qr_code_labels'):
             logger.info("🔍 Checking QR code labels table for missing columns...")
+            
+            # First handle the problematic label_number field if it exists without a default
+            try:
+                if self.column_exists('qr_code_labels', 'label_number'):
+                    logger.info("⚠️ Found existing label_number column, fixing to allow NULL or have default...")
+                    # Try to make it nullable first, then add a default
+                    self.execute_query("ALTER TABLE qr_code_labels MODIFY COLUMN label_number VARCHAR(50) NULL")
+                    self.execute_query("ALTER TABLE qr_code_labels ALTER COLUMN label_number SET DEFAULT NULL")
+                    logger.info("✅ Fixed label_number column to be nullable")
+                else:
+                    # Add label_number if it doesn't exist (for compatibility)
+                    self.execute_query("ALTER TABLE qr_code_labels ADD COLUMN label_number VARCHAR(50) NULL")
+                    logger.info("✅ Added label_number column for backward compatibility")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not fix label_number column: {e}")
+                # If all else fails, try to drop the NOT NULL constraint
+                try:
+                    self.execute_query("ALTER TABLE qr_code_labels MODIFY COLUMN label_number VARCHAR(50)")
+                    logger.info("✅ Removed NOT NULL constraint from label_number column")
+                except Exception as e2:
+                    logger.error(f"❌ Could not fix label_number column at all: {e2}")
+            
             qr_code_columns = [
                 ('item_name', 'VARCHAR(200)'),
                 ('po_number', 'VARCHAR(100)'),
@@ -752,12 +774,13 @@ BACKUP_PATH=backups/
             """)
             logger.info("✅ Bin scanning logs table created")
 
-        # 17. QR Code Labels (depends on users) - Updated to match current models
+        # 17. QR Code Labels (depends on users) - Updated to match current models exactly
         if not self.table_exists('qr_code_labels'):
             logger.info("Creating qr_code_labels table...")
             self.execute_query("""
                 CREATE TABLE qr_code_labels (
                     id INT AUTO_INCREMENT PRIMARY KEY,
+                    label_number VARCHAR(50) NULL,
                     label_type VARCHAR(50) NOT NULL,
                     item_code VARCHAR(100) NOT NULL,
                     item_name VARCHAR(200),
@@ -778,6 +801,7 @@ BACKUP_PATH=backups/
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                     FOREIGN KEY (grpo_item_id) REFERENCES grpo_items(id) ON DELETE SET NULL,
                     FOREIGN KEY (inventory_transfer_item_id) REFERENCES inventory_transfer_items(id) ON DELETE SET NULL,
+                    INDEX idx_label_number (label_number),
                     INDEX idx_label_type (label_type),
                     INDEX idx_item_code (item_code),
                     INDEX idx_po_number (po_number),
@@ -785,7 +809,7 @@ BACKUP_PATH=backups/
                     INDEX idx_warehouse_bin (warehouse_code, bin_code)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
-            logger.info("✅ QR code labels table created")
+            logger.info("✅ QR code labels table created with label_number field")
 
         # Legacy inventory counting documents for backward compatibility  
         if not self.table_exists('inventory_counting_documents'):
