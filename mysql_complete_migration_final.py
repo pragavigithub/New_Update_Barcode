@@ -250,8 +250,55 @@ BACKUP_PATH=backups/
                     except Exception as e:
                         logger.warning(f"⚠️ Could not add column pick_lists.{col_name}: {e}")
         
+        # CRITICAL: Check QR Code Labels table for missing columns
+        if self.table_exists('qr_code_labels'):
+            logger.info("🔍 Checking QR code labels table for missing columns...")
+            qr_code_columns = [
+                ('item_name', 'VARCHAR(200)'),
+                ('po_number', 'VARCHAR(100)'),
+                ('bin_code', 'VARCHAR(100)'),
+                ('grpo_item_id', 'INT'),
+                ('inventory_transfer_item_id', 'INT'),
+                ('qr_content', 'TEXT'),
+                ('qr_format', 'VARCHAR(20) DEFAULT "TEXT"'),
+                ('label_type', 'VARCHAR(50)'),
+                ('quantity', 'DECIMAL(15,4)'),
+                ('uom', 'VARCHAR(20)'),
+                ('warehouse_code', 'VARCHAR(50)'),
+                ('batch_number', 'VARCHAR(100)'),
+                ('expiry_date', 'DATE'),
+                ('user_id', 'INT'),
+                ('created_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP'),
+                ('updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+            ]
+            
+            for col_name, col_def in qr_code_columns:
+                if not self.column_exists('qr_code_labels', col_name):
+                    try:
+                        self.execute_query(f"ALTER TABLE qr_code_labels ADD COLUMN {col_name} {col_def}")
+                        logger.info(f"✅ Added missing column: qr_code_labels.{col_name} - CRITICAL FOR QR CODE GENERATION")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not add column qr_code_labels.{col_name}: {e}")
+        
+        # Check bin_items table for missing columns
+        if self.table_exists('bin_items'):
+            bin_item_columns = [
+                ('item_name', 'VARCHAR(255)'),
+                ('batch_attribute1', 'VARCHAR(100)'),
+                ('batch_attribute2', 'VARCHAR(100)'),
+                ('batch_status', 'VARCHAR(50) DEFAULT "bdsStatus_Released"'),
+            ]
+            
+            for col_name, col_def in bin_item_columns:
+                if not self.column_exists('bin_items', col_name):
+                    try:
+                        self.execute_query(f"ALTER TABLE bin_items ADD COLUMN {col_name} {col_def}")
+                        logger.info(f"✅ Added missing column: bin_items.{col_name}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not add column bin_items.{col_name}: {e}")
+
         self.connection.commit()
-        logger.info("✅ Column migration completed")
+        logger.info("✅ Column migration completed - QR Code generation should work now!")
     
     def create_all_tables(self):
         """Create all WMS tables in correct order (dependencies first)"""

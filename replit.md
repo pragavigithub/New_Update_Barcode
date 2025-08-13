@@ -27,6 +27,9 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - All schema mismatches between models and MySQL migration file resolved
 - Added missing tables: inventory_counts, inventory_count_items, barcode_labels, bin_locations
 - Fixed GRPO and inventory transfer table schemas to match current implementation
+- **2025-08-13**: Fixed QR code generation issue by adding missing column detection
+- Added comprehensive column migration for `qr_code_labels` table including `item_name`, `po_number`, `bin_code`
+- Migration file now handles existing databases with missing columns automatically
 
 ## User Preferences
 - None specified yet
