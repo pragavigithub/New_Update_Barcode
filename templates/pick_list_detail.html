@@ -22,11 +22,23 @@
                 </button>
                 {% endif %}
                 
-                {% if pick_list.absolute_entry and pick_list.status in ['ps_Open', 'approved'] %}
+                <!-- Show Mark as Picked button for SAP pick lists -->
+                {% if pick_list.absolute_entry %}
                 <button class="btn btn-primary ms-2" onclick="markAsPicked({{ pick_list.id }}, {{ pick_list.absolute_entry }})">
                     <i data-feather="package"></i> Mark as Picked
                 </button>
+                {% else %}
+                <!-- Show for testing purposes when no absolute_entry -->
+                <button class="btn btn-secondary ms-2" disabled title="No SAP connection">
+                    <i data-feather="package"></i> Mark as Picked (SAP Required)
+                </button>
                 {% endif %}
+                
+                <!-- Debug: Show button conditions -->
+                <div class="small text-muted mt-2">
+                    Debug: absolute_entry={{ pick_list.absolute_entry or 'None' }}, status={{ pick_list.status }}, 
+                    user_role={{ current_user.role }}, has_permission={{ current_user.has_permission('pick_list') }}
+                </div>
                 
                 <a href="{{ url_for('pick_list') }}" class="btn btn-outline-secondary ms-2">
                     <i data-feather="arrow-left"></i> Back to Pick Lists
