@@ -2,6 +2,7 @@
 Enhanced SAP B1 Bin Scanning Integration
 Fix for get_bin_items function with proper OnStock/OnHand API calls
 """
+import logging
 
 def get_bin_items_enhanced(self, bin_code):
     """Get items in a specific bin location with OnStock/OnHand details
@@ -15,35 +16,7 @@ def get_bin_items_enhanced(self, bin_code):
     if not self.ensure_logged_in():
         # Return mock data for offline mode
         logging.warning(f"SAP B1 not available, returning mock bin data for {bin_code}")
-        return [{
-            'ItemCode': 'CO0726Y',
-            'ItemName': 'COATED LOWER PLATE',
-            'OnHand': 50.0,
-            'OnStock': 45.0,
-            'UoM': 'EA',
-            'BatchNumber': '20220729',
-            'ExpiryDate': None,
-            'AdmissionDate': '2022-07-29T00:00:00Z',
-            'Status': 'bdsStatus_Released',
-            'Warehouse': '7000-FG',
-            'BinCode': bin_code,
-            'BinAbsEntry': 1,
-            'BusinessPlaceID': 5
-        }, {
-            'ItemCode': 'CO0098Y',
-            'ItemName': 'Big Aluminium Insert Coated RR AC0101',
-            'OnHand': 25.0,
-            'OnStock': 20.0,
-            'UoM': 'PCS',
-            'BatchNumber': '20220729',
-            'ExpiryDate': None,
-            'AdmissionDate': '2022-07-29T00:00:00Z',
-            'Status': 'bdsStatus_Released',
-            'Warehouse': '7000-FG',
-            'BinCode': bin_code,
-            'BinAbsEntry': 1,
-            'BusinessPlaceID': 5
-        }]
+        return []
 
     try:
         # Step 1: Get bin information using provided API pattern
