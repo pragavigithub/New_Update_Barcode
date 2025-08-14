@@ -2474,7 +2474,7 @@ class SAPIntegration:
                         ).first()
                         
                         if order_line:
-                            # Enhance the picklist line with Sales Order data
+                            # Enhance the picklist line with Sales Order data directly on the line object
                             enhanced_line.update({
                                 'ItemCode': order_line.item_code,
                                 'ItemDescription': order_line.item_description,
