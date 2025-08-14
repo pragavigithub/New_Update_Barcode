@@ -1786,10 +1786,16 @@ def import_sap_pick_list(absolute_entry):
             ).delete()
             PickListLine.query.filter_by(pick_list_id=pick_list.id).delete()
         else:
+            # Extract sales order info from first line if available
+            first_line = sap_pick_list.get('PickListsLines', [{}])[0] if sap_pick_list.get('PickListsLines') else {}
+            base_doc_entry = first_line.get('BaseObjectType') == 17 and first_line.get('OrderEntry')
+            
             # Create new pick list
             pick_list = PickList(
                 absolute_entry=absolute_entry,
                 name=sap_pick_list.get('Name', f'SAP-{absolute_entry}'),
+                pick_list_number=sap_pick_list.get('Name', f'PL-{absolute_entry}'),
+                sales_order_number=f'SO-{base_doc_entry}' if base_doc_entry else f'SO-{absolute_entry}',
                 owner_code=sap_pick_list.get('OwnerCode'),
                 owner_name=sap_pick_list.get('OwnerName'),
                 remarks=sap_pick_list.get('Remarks'),
@@ -1926,6 +1932,16 @@ def create_pick_list():
         flash(f'Pick List with Absolute Entry {absolute_entry} already exists', 'warning')
         return redirect(url_for('pick_list_detail', pick_list_id=existing_pick_list.id))
     
+    # Generate proper pick list number if not provided
+    if not pick_list_number:
+        pick_list_number = DocumentNumberSeries.get_next_number('PICKLIST')
+    
+    # Use SAP sales order number or generate one if not provided  
+    if not sales_order_number and absolute_entry:
+        sales_order_number = f"SO-{absolute_entry}"
+    elif not sales_order_number:
+        sales_order_number = f"SO-{datetime.now().strftime('%Y%m%d')}-{request.form.get('customer_code', 'CUST')}"
+    
     # Create new pick list with SAP integration
     pick_list = PickList(
         name=name,
@@ -1937,6 +1953,7 @@ def create_pick_list():
         priority=request.form.get('priority', 'normal'),
         warehouse_code=request.form.get('warehouse_code'),
         customer_name=request.form.get('customer_name'),
+        customer_code=request.form.get('customer_code'),
         notes=request.form.get('notes')
     )
     
