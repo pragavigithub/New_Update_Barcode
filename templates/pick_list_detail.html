@@ -35,10 +35,10 @@
                 {% endif %}
                 
                 <!-- Debug: Show button conditions -->
-                <div class="small text-muted mt-2">
-                    Debug: absolute_entry={{ pick_list.absolute_entry or 'None' }}, status={{ pick_list.status }}, 
-                    user_role={{ current_user.role }}, has_permission={{ current_user.has_permission('pick_list') }}
-                </div>
+<!--                <div class="small text-muted mt-2">-->
+<!--                    Debug: absolute_entry={{ pick_list.absolute_entry or 'None' }}, status={{ pick_list.status }}, -->
+<!--                    user_role={{ current_user.role }}, has_permission={{ current_user.has_permission('pick_list') }}-->
+<!--                </div>-->
                 
                 <a href="{{ url_for('pick_list') }}" class="btn btn-outline-secondary ms-2">
                     <i data-feather="arrow-left"></i> Back to Pick Lists
