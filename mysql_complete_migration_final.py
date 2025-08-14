@@ -324,8 +324,65 @@ BACKUP_PATH=backups/
                     except Exception as e:
                         logger.warning(f"⚠️ Could not add column bin_items.{col_name}: {e}")
 
+        # Check sales_orders table for missing columns (for picklist integration)
+        if self.table_exists('sales_orders'):
+            sales_order_columns = [
+                ('doc_entry', 'INT UNIQUE NOT NULL'),
+                ('doc_num', 'INT'),
+                ('doc_type', 'VARCHAR(50)'),
+                ('doc_date', 'DATETIME'),
+                ('doc_due_date', 'DATETIME'),
+                ('card_code', 'VARCHAR(50)'),
+                ('card_name', 'VARCHAR(200)'),
+                ('address', 'TEXT'),
+                ('doc_total', 'DECIMAL(15,2)'),
+                ('doc_currency', 'VARCHAR(10)'),
+                ('comments', 'TEXT'),
+                ('document_status', 'VARCHAR(50)'),
+                ('last_sap_sync', 'DATETIME DEFAULT CURRENT_TIMESTAMP')
+            ]
+            
+            for col_name, col_def in sales_order_columns:
+                if not self.column_exists('sales_orders', col_name):
+                    try:
+                        if 'UNIQUE' in col_def:
+                            # Handle unique constraint separately for existing tables
+                            base_def = col_def.replace(' UNIQUE', '').replace(' NOT NULL', '')
+                            self.execute_query(f"ALTER TABLE sales_orders ADD COLUMN {col_name} {base_def}")
+                            logger.info(f"✅ Added missing column: sales_orders.{col_name}")
+                        else:
+                            self.execute_query(f"ALTER TABLE sales_orders ADD COLUMN {col_name} {col_def}")
+                            logger.info(f"✅ Added missing column: sales_orders.{col_name}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not add column sales_orders.{col_name}: {e}")
+
+        # Check sales_order_lines table for missing columns
+        if self.table_exists('sales_order_lines'):
+            sales_order_line_columns = [
+                ('sales_order_id', 'INT NOT NULL'),
+                ('line_num', 'INT NOT NULL'),
+                ('item_code', 'VARCHAR(100)'),
+                ('item_description', 'VARCHAR(255)'),
+                ('quantity', 'DECIMAL(15,3)'),
+                ('open_quantity', 'DECIMAL(15,3)'),
+                ('delivered_quantity', 'DECIMAL(15,3)'),
+                ('unit_price', 'DECIMAL(15,4)'),
+                ('line_total', 'DECIMAL(15,2)'),
+                ('warehouse_code', 'VARCHAR(50)'),
+                ('unit_of_measure', 'VARCHAR(20)'),
+                ('line_status', 'VARCHAR(50)')
+            ]
+            
+            for col_name, col_def in sales_order_line_columns:
+                if not self.column_exists('sales_order_lines', col_name):
+                    try:
+                        self.execute_query(f"ALTER TABLE sales_order_lines ADD COLUMN {col_name} {col_def}")
+                        logger.info(f"✅ Added missing column: sales_order_lines.{col_name}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not add column sales_order_lines.{col_name}: {e}")
+
         self.connection.commit()
-        logger.info("✅ Column migration completed - QR Code generation should work now!")
+        logger.info("✅ Column migration completed - QR Code generation and Sales Order integration should work now!")
     
     def create_all_tables(self):
         """Create all WMS tables in correct order (dependencies first)"""
@@ -758,7 +815,68 @@ BACKUP_PATH=backups/
             """)
             logger.info("✅ Bin items table created")
 
-        # 16. Bin Scanning Logs (depends on users and bin_locations)
+        # 16. Sales Orders (for picklist integration)
+        if not self.table_exists('sales_orders'):
+            logger.info("Creating sales_orders table...")
+            self.execute_query("""
+                CREATE TABLE sales_orders (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    doc_entry INT UNIQUE NOT NULL,
+                    doc_num INT,
+                    doc_type VARCHAR(50),
+                    doc_date DATETIME,
+                    doc_due_date DATETIME,
+                    card_code VARCHAR(50),
+                    card_name VARCHAR(200),
+                    address TEXT,
+                    doc_total DECIMAL(15,2),
+                    doc_currency VARCHAR(10),
+                    comments TEXT,
+                    document_status VARCHAR(50),
+                    last_sap_sync DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_doc_entry (doc_entry),
+                    INDEX idx_doc_num (doc_num),
+                    INDEX idx_card_code (card_code),
+                    INDEX idx_doc_status (document_status),
+                    INDEX idx_sap_sync (last_sap_sync)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Sales orders table created")
+
+        # 17. Sales Order Lines (depends on sales_orders)
+        if not self.table_exists('sales_order_lines'):
+            logger.info("Creating sales_order_lines table...")
+            self.execute_query("""
+                CREATE TABLE sales_order_lines (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    sales_order_id INT NOT NULL,
+                    line_num INT NOT NULL,
+                    item_code VARCHAR(100),
+                    item_description VARCHAR(255),
+                    quantity DECIMAL(15,3),
+                    open_quantity DECIMAL(15,3),
+                    delivered_quantity DECIMAL(15,3),
+                    unit_price DECIMAL(15,4),
+                    line_total DECIMAL(15,2),
+                    warehouse_code VARCHAR(50),
+                    unit_of_measure VARCHAR(20),
+                    line_status VARCHAR(50),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (sales_order_id) REFERENCES sales_orders(id) ON DELETE CASCADE,
+                    INDEX idx_sales_order (sales_order_id),
+                    INDEX idx_line_num (line_num),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_warehouse (warehouse_code),
+                    INDEX idx_line_status (line_status),
+                    UNIQUE KEY unique_order_line (sales_order_id, line_num)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Sales order lines table created")
+
+        # 19. Bin Scanning Logs (depends on users and bin_locations)
         if not self.table_exists('bin_scanning_logs'):
             logger.info("Creating bin_scanning_logs table...")
             self.execute_query("""
@@ -779,7 +897,7 @@ BACKUP_PATH=backups/
             """)
             logger.info("✅ Bin scanning logs table created")
 
-        # 17. QR Code Labels (depends on users) - Updated to match current models exactly
+        # 20. QR Code Labels (depends on users) - Updated to match current models exactly
         if not self.table_exists('qr_code_labels'):
             logger.info("Creating qr_code_labels table...")
             self.execute_query("""

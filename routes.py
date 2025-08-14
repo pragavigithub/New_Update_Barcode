@@ -1483,6 +1483,11 @@ def pick_list_detail(pick_list_id):
             if sap_result.get('success'):
                 sap_pick_list = sap_result['pick_list']
                 
+                # Enhance picklist lines with Sales Order data
+                pick_list_lines_data = sap_pick_list.get('PickListsLines', [])
+                enhanced_lines = sap.enhance_picklist_with_sales_order_data(pick_list_lines_data)
+                sap_pick_list['PickListsLines'] = enhanced_lines
+                
                 # Update local record with SAP data if needed
                 if sap_pick_list.get('Status') != pick_list.status:
                     pick_list.status = sap_pick_list.get('Status', pick_list.status)
@@ -1516,6 +1521,12 @@ def pick_list_detail(pick_list_id):
                         str(sap_pl.get('Absoluteentry')) == str(pick_list.pick_list_number)):
                         # Found a match, link it
                         pick_list.absolute_entry = sap_pl.get('Absoluteentry')
+                        
+                        # Enhance with Sales Order data before syncing
+                        pick_list_lines_data = sap_pl.get('PickListsLines', [])
+                        enhanced_lines = sap.enhance_picklist_with_sales_order_data(pick_list_lines_data)
+                        sap_pl['PickListsLines'] = enhanced_lines
+                        
                         # Sync the data
                         sync_result = sap.sync_pick_list_to_local_db(sap_pl, pick_list)
                         if sync_result.get('success'):
@@ -1551,6 +1562,11 @@ def create_pick_list_from_sap(absolute_entry):
             })
         
         sap_pick_list = sap_result['pick_list']
+        
+        # Enhance picklist lines with Sales Order data before processing
+        pick_list_lines_data = sap_pick_list.get('PickListsLines', [])
+        enhanced_lines = sap.enhance_picklist_with_sales_order_data(pick_list_lines_data)
+        sap_pick_list['PickListsLines'] = enhanced_lines
         
         # Check if pick list already exists locally
         existing_pick_list = PickList.query.filter_by(absolute_entry=absolute_entry).first()

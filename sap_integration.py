@@ -2287,6 +2287,246 @@ class SAPIntegration:
 
         return results
 
+    def get_sales_order_by_doc_entry(self, doc_entry):
+        """Get Sales Order by DocEntry for picklist integration"""
+        if not self.ensure_logged_in():
+            logging.warning("SAP B1 not available for Sales Order lookup")
+            return self._get_mock_sales_order(doc_entry)
+
+        try:
+            url = f"{self.base_url}/b1s/v1/Orders?$filter=DocEntry eq {doc_entry}"
+            logging.info(f"🔍 Fetching Sales Order DocEntry={doc_entry}: {url}")
+            
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                orders = data.get('value', [])
+                
+                if orders:
+                    order = orders[0]
+                    logging.info(f"✅ Found Sales Order DocEntry={doc_entry}: {order.get('CardCode')} - {order.get('CardName')}")
+                    return {
+                        'success': True,
+                        'sales_order': order
+                    }
+                else:
+                    logging.warning(f"⚠️ Sales Order DocEntry={doc_entry} not found")
+                    return {'success': False, 'error': f'Sales Order {doc_entry} not found'}
+            else:
+                logging.error(f"❌ Error fetching Sales Order: {response.status_code} - {response.text}")
+                return {'success': False, 'error': f'HTTP {response.status_code}'}
+                
+        except Exception as e:
+            logging.error(f"Error getting Sales Order {doc_entry} from SAP B1: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def _get_mock_sales_order(self, doc_entry):
+        """Mock Sales Order data for development/offline mode"""
+        return {
+            'success': True,
+            'sales_order': {
+                "DocEntry": doc_entry,
+                "DocNum": 232410148,
+                "DocType": "dDocument_Items",
+                "DocDate": "2024-02-02T00:00:00Z",
+                "CardCode": "ALFEPL",
+                "CardName": "ALF Engineering Pvt. Ltd",
+                "DocumentStatus": "bost_Open",
+                "DocumentLines": [
+                    {
+                        "LineNum": 0,
+                        "ItemCode": "ITEM001",
+                        "ItemDescription": "Sample Item 1",
+                        "Quantity": 1000.0,
+                        "OpenQuantity": 500.0,
+                        "DeliveredQuantity": 500.0,
+                        "UnitPrice": 100.0,
+                        "LineTotal": 100000.0,
+                        "WarehouseCode": "7000-FG",
+                        "UoMCode": "EA",
+                        "LineStatus": "bost_Open"
+                    },
+                    {
+                        "LineNum": 1,
+                        "ItemCode": "ITEM002", 
+                        "ItemDescription": "Sample Item 2",
+                        "Quantity": 2000.0,
+                        "OpenQuantity": 1000.0,
+                        "DeliveredQuantity": 1000.0,
+                        "UnitPrice": 150.0,
+                        "LineTotal": 300000.0,
+                        "WarehouseCode": "7000-FG",
+                        "UoMCode": "EA",
+                        "LineStatus": "bost_Open"
+                    }
+                ]
+            }
+        }
+
+    def sync_sales_order_to_local_db(self, order_data):
+        """Sync Sales Order data to local database"""
+        try:
+            from app import db
+            from models import SalesOrder, SalesOrderLine
+            from datetime import datetime
+            
+            doc_entry = order_data.get('DocEntry')
+            if not doc_entry:
+                return {'success': False, 'error': 'Missing DocEntry'}
+            
+            # Check if Sales Order already exists
+            sales_order = SalesOrder.query.filter_by(doc_entry=doc_entry).first()
+            
+            if not sales_order:
+                sales_order = SalesOrder()
+                db.session.add(sales_order)
+            
+            # Update Sales Order fields
+            sales_order.doc_entry = doc_entry
+            sales_order.doc_num = order_data.get('DocNum')
+            sales_order.doc_type = order_data.get('DocType')
+            
+            # Parse dates
+            doc_date = order_data.get('DocDate')
+            if doc_date:
+                if isinstance(doc_date, str):
+                    sales_order.doc_date = datetime.fromisoformat(doc_date.replace('Z', '+00:00'))
+                else:
+                    sales_order.doc_date = doc_date
+            
+            doc_due_date = order_data.get('DocDueDate')
+            if doc_due_date:
+                if isinstance(doc_due_date, str):
+                    sales_order.doc_due_date = datetime.fromisoformat(doc_due_date.replace('Z', '+00:00'))
+                else:
+                    sales_order.doc_due_date = doc_due_date
+            
+            sales_order.card_code = order_data.get('CardCode')
+            sales_order.card_name = order_data.get('CardName')
+            sales_order.address = order_data.get('Address')
+            sales_order.doc_total = order_data.get('DocTotal')
+            sales_order.doc_currency = order_data.get('DocCurrency')
+            sales_order.comments = order_data.get('Comments')
+            sales_order.document_status = order_data.get('DocumentStatus')
+            sales_order.last_sap_sync = datetime.utcnow()
+            
+            db.session.flush()  # Get the ID
+            
+            # Sync Sales Order Lines
+            lines_synced = 0
+            document_lines = order_data.get('DocumentLines', [])
+            
+            for line_data in document_lines:
+                line_num = line_data.get('LineNum')
+                if line_num is None:
+                    continue
+                    
+                # Check if line already exists
+                order_line = SalesOrderLine.query.filter_by(
+                    sales_order_id=sales_order.id,
+                    line_num=line_num
+                ).first()
+                
+                if not order_line:
+                    order_line = SalesOrderLine()
+                    order_line.sales_order_id = sales_order.id
+                    db.session.add(order_line)
+                
+                # Update line fields
+                order_line.line_num = line_num
+                order_line.item_code = line_data.get('ItemCode')
+                order_line.item_description = line_data.get('ItemDescription') or line_data.get('Dscription')
+                order_line.quantity = line_data.get('Quantity')
+                order_line.open_quantity = line_data.get('OpenQuantity')
+                order_line.delivered_quantity = line_data.get('DeliveredQuantity')
+                order_line.unit_price = line_data.get('UnitPrice')
+                order_line.line_total = line_data.get('LineTotal')
+                order_line.warehouse_code = line_data.get('WarehouseCode')
+                order_line.unit_of_measure = line_data.get('UoMCode')
+                order_line.line_status = line_data.get('LineStatus')
+                
+                lines_synced += 1
+            
+            db.session.commit()
+            
+            logging.info(f"✅ Synced Sales Order {doc_entry} with {lines_synced} lines")
+            return {
+                'success': True,
+                'sales_order_id': sales_order.id,
+                'lines_synced': lines_synced
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error syncing Sales Order to local DB: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def enhance_picklist_with_sales_order_data(self, picklist_lines):
+        """Enhance picklist lines with Sales Order item details"""
+        enhanced_lines = []
+        
+        try:
+            from app import db
+            from models import SalesOrder, SalesOrderLine
+            
+            for line in picklist_lines:
+                enhanced_line = line.copy()
+                
+                order_entry = line.get('OrderEntry')
+                order_row_id = line.get('OrderRowID')
+                
+                if order_entry and order_row_id is not None:
+                    # First try to get from local database
+                    sales_order = SalesOrder.query.filter_by(doc_entry=order_entry).first()
+                    
+                    if not sales_order:
+                        # Fetch from SAP B1 and sync to local
+                        sap_result = self.get_sales_order_by_doc_entry(order_entry)
+                        if sap_result.get('success'):
+                            sync_result = self.sync_sales_order_to_local_db(sap_result['sales_order'])
+                            if sync_result.get('success'):
+                                sales_order = SalesOrder.query.filter_by(doc_entry=order_entry).first()
+                    
+                    if sales_order:
+                        # Get the specific line based on OrderRowID (which corresponds to LineNum)
+                        order_line = SalesOrderLine.query.filter_by(
+                            sales_order_id=sales_order.id,
+                            line_num=order_row_id
+                        ).first()
+                        
+                        if order_line:
+                            # Enhance the picklist line with Sales Order data
+                            enhanced_line.update({
+                                'ItemCode': order_line.item_code,
+                                'ItemDescription': order_line.item_description,
+                                'SalesOrderDocNum': sales_order.doc_num,
+                                'CustomerCode': sales_order.card_code,
+                                'CustomerName': sales_order.card_name,
+                                'OrderQuantity': order_line.quantity,
+                                'OpenQuantity': order_line.open_quantity,
+                                'UnitOfMeasure': order_line.unit_of_measure,
+                                'WarehouseCode': order_line.warehouse_code,
+                                'UnitPrice': order_line.unit_price,
+                                'LineTotal': order_line.line_total
+                            })
+                            
+                            logging.info(f"✅ Enhanced picklist line {line.get('LineNumber')} with Sales Order data: {order_line.item_code}")
+                        else:
+                            logging.warning(f"⚠️ Sales Order line not found: OrderEntry={order_entry}, OrderRowID={order_row_id}")
+                    else:
+                        logging.warning(f"⚠️ Could not sync Sales Order: OrderEntry={order_entry}")
+                else:
+                    logging.debug(f"No OrderEntry or OrderRowID for picklist line {line.get('LineNumber')}")
+                
+                enhanced_lines.append(enhanced_line)
+                
+        except Exception as e:
+            logging.error(f"Error enhancing picklist with Sales Order data: {str(e)}")
+            return picklist_lines  # Return original lines if enhancement fails
+        
+        return enhanced_lines
+
     def logout(self):
         """Logout from SAP B1"""
         if self.session_id:

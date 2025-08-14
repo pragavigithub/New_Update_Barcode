@@ -544,6 +544,68 @@ class QRCodeLabel(db.Model):
 
 
 
+class SalesOrder(db.Model):
+    """SAP B1 Sales Order model for Pick List integration"""
+    __tablename__ = 'sales_orders'
+
+    id = db.Column(db.Integer, primary_key=True)
+    # SAP B1 Sales Order fields
+    doc_entry = db.Column(db.Integer, nullable=False, unique=True)  # From SAP B1 DocEntry
+    doc_num = db.Column(db.Integer, nullable=True)  # From SAP B1 DocNum
+    doc_type = db.Column(db.String(20), nullable=True)  # From SAP B1 DocType
+    doc_date = db.Column(db.DateTime, nullable=True)  # From SAP B1 DocDate
+    doc_due_date = db.Column(db.DateTime, nullable=True)  # From SAP B1 DocDueDate
+    card_code = db.Column(db.String(50), nullable=True)  # From SAP B1 CardCode
+    card_name = db.Column(db.String(200), nullable=True)  # From SAP B1 CardName
+    address = db.Column(db.Text, nullable=True)  # From SAP B1 Address
+    doc_total = db.Column(db.Float, nullable=True)  # From SAP B1 DocTotal
+    doc_currency = db.Column(db.String(10), nullable=True)  # From SAP B1 DocCurrency
+    comments = db.Column(db.Text, nullable=True)  # From SAP B1 Comments
+    document_status = db.Column(db.String(20), nullable=True)  # From SAP B1 DocumentStatus
+    
+    # Additional fields for tracking
+    last_sap_sync = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    order_lines = relationship('SalesOrderLine', back_populates='sales_order', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<SalesOrder DocEntry={self.doc_entry} CardCode={self.card_code}>'
+
+
+class SalesOrderLine(db.Model):
+    """SAP B1 Sales Order Lines model for Pick List item lookup"""
+    __tablename__ = 'sales_order_lines'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id'), nullable=False)
+    
+    # SAP B1 Sales Order Line fields
+    line_num = db.Column(db.Integer, nullable=False)  # From SAP B1 LineNum
+    item_code = db.Column(db.String(50), nullable=True)  # From SAP B1 ItemCode
+    item_description = db.Column(db.String(200), nullable=True)  # From SAP B1 ItemDescription/Dscription
+    quantity = db.Column(db.Float, nullable=True)  # From SAP B1 Quantity
+    open_quantity = db.Column(db.Float, nullable=True)  # From SAP B1 OpenQuantity
+    delivered_quantity = db.Column(db.Float, nullable=True)  # From SAP B1 DeliveredQuantity
+    unit_price = db.Column(db.Float, nullable=True)  # From SAP B1 UnitPrice
+    line_total = db.Column(db.Float, nullable=True)  # From SAP B1 LineTotal
+    warehouse_code = db.Column(db.String(10), nullable=True)  # From SAP B1 WarehouseCode
+    unit_of_measure = db.Column(db.String(10), nullable=True)  # From SAP B1 UoMCode
+    line_status = db.Column(db.String(20), nullable=True)  # From SAP B1 LineStatus
+    
+    # Additional tracking fields
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    sales_order = relationship('SalesOrder', back_populates='order_lines')
+
+    def __repr__(self):
+        return f'<SalesOrderLine {self.item_code} Line={self.line_num}>'
+
+
 class DocumentNumberSeries(db.Model):
     __tablename__ = 'document_number_series'
 

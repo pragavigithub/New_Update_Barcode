@@ -13,6 +13,7 @@ This guide consolidates ALL MySQL migration needs into a single comprehensive sc
 - ✅ Inventory Transfer with line items and warehouse support
 - ✅ Pick List Management with SAP B1 integration (ps_released focus)
 - ✅ Pick List Lines and Bin Allocations (SAP B1 compatible)
+- ✅ Sales Orders and Sales Order Lines (for enhanced picklist integration)
 - ✅ Inventory Counting with line items
 - ✅ Bin Scanning with logging
 - ✅ QR Code Label printing and tracking
@@ -83,9 +84,10 @@ The migration creates a comprehensive .env file with:
 3. **grpo_documents** + **grpo_line_items** - Purchase receipt processing
 4. **inventory_transfer_documents** + **inventory_transfer_line_items** - Stock movements
 5. **pick_lists** + **pick_list_lines** + **pick_list_bin_allocations** - SAP B1 compatible picking
-6. **inventory_counting_documents** + **inventory_counting_line_items** - Stock counting
-7. **bin_scanning_logs** - Barcode scanning history
-8. **qr_code_labels** - Label generation and tracking
+6. **sales_orders** + **sales_order_lines** - Sales Order integration for enhanced picklist functionality
+7. **inventory_counting_documents** + **inventory_counting_line_items** - Stock counting
+8. **bin_scanning_logs** - Barcode scanning history
+9. **qr_code_labels** - Label generation and tracking
 
 ### Key Features
 - **SAP B1 Integration**: Pick lists fully compatible with SAP Business One API

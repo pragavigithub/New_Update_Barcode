@@ -34,6 +34,12 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - Updated migration to handle all legacy QR code table schemas from previous implementations
 - Enhanced GRPO module: "+Add Item" buttons are now disabled for closed PO lines and enabled for open lines
 - Added status-based button management for better user experience and data integrity
+- **2025-08-14**: Enhanced Picklist module with Sales Order integration
+- Added SalesOrder and SalesOrderLine models to enable enhanced picklist functionality
+- Implemented SAP B1 Sales Order API integration functions for fetching and syncing sales orders
+- Updated picklist routes to enhance lines with Sales Order data including ItemCode, Customer details, and quantities
+- Added Sales Order tables to MySQL migration file with proper indexing and foreign keys
+- Enhanced picklist lines now display item details from matching Sales Orders based on OrderEntry and LineNum
 
 ## User Preferences
 - None specified yet
