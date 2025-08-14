@@ -76,6 +76,8 @@
                                 <span class="badge bg-success">SAP Closed</span>
                             {% elif pick_list.status == 'ps_Picked' %}
                                 <span class="badge bg-info">SAP Picked</span>
+                            {% elif pick_list.status == 'ps_PartiallyPicked' %}
+                                <span class="badge bg-warning">Partially Picked</span>
                             {% else %}
                                 <span class="badge bg-secondary">{{ pick_list.status }}</span>
                             {% endif %}
@@ -196,8 +198,10 @@
                                 <td>
                                     {% if line.PickStatus == 'ps_Open' %}
                                         <span class="badge bg-warning">Open</span>
+                                    {% elif line.PickStatus == 'ps_Picked' %}
+                                        <span class="badge bg-success">Picked</span>
                                     {% elif line.PickStatus == 'ps_Closed' %}
-                                        <span class="badge bg-success">Closed</span>
+                                        <span class="badge bg-secondary">Closed</span>
                                     {% else %}
                                         <span class="badge bg-secondary">{{ line.PickStatus }}</span>
                                     {% endif %}
@@ -221,6 +225,11 @@
                                     <button class="btn btn-sm btn-outline-primary" onclick="viewLineDetails({{ line.LineNumber }})">
                                         <i data-feather="eye"></i>
                                     </button>
+                                    {% if line.PickStatus != 'ps_Picked' %}
+                                    <button class="btn btn-sm btn-success ms-1" onclick="markSAPLineAsPicked({{ line.LineNumber }}, '{{ line.ItemCode or line.OrderEntry }}', {{ pick_list.absolute_entry }}, {{ line.ReleasedQuantity }})">
+                                        <i data-feather="check"></i> Pick
+                                    </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             <!-- Bin Allocations Details -->
@@ -350,6 +359,11 @@
                                     <button class="btn btn-sm btn-outline-info" onclick="showBinAllocations({{ line.id }})">
                                         <i data-feather="map-pin"></i> Bins
                                     </button>
+                                    {% if line.pick_status != 'ps_Picked' %}
+                                    <button class="btn btn-sm btn-success ms-1" onclick="markLineAsPicked({{ line.id }}, '{{ line.item_code }}')">
+                                        <i data-feather="check"></i> Pick
+                                    </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -565,6 +579,88 @@ async function markAsPicked(pickListId, absoluteEntry) {
             // Restore button
             const button = event.target;
             button.innerHTML = '<i data-feather="package"></i> Mark as Picked';
+            button.disabled = false;
+        }
+    }
+}
+
+async function markSAPLineAsPicked(lineNumber, itemCode, absoluteEntry, releasedQuantity) {
+    if (confirm(`Are you sure you want to mark line ${lineNumber} (${itemCode}) as picked?`)) {
+        try {
+            // Show loading indicator on the button
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i data-feather="loader" class="spinner"></i> Picking...';
+            button.disabled = true;
+            
+            const response = await fetch(`/api/pick-list/line/${absoluteEntry}/mark-picked`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    line_number: lineNumber,
+                    item_code: itemCode,
+                    picked_quantity: releasedQuantity,
+                    absolute_entry: absoluteEntry
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                alert(`Line ${lineNumber} marked as picked successfully!`);
+                location.reload();
+            } else {
+                alert(`Error marking line as picked: ${result.error || 'Unknown error'}`);
+                // Restore button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error marking line as picked:', error);
+            alert('Error marking line as picked');
+            // Restore button
+            const button = event.target;
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    }
+}
+
+async function markLineAsPicked(lineId, itemCode) {
+    if (confirm(`Are you sure you want to mark ${itemCode} as picked?`)) {
+        try {
+            // Show loading indicator on the button
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i data-feather="loader" class="spinner"></i> Picking...';
+            button.disabled = true;
+            
+            const response = await fetch(`/api/pick-list-line/${lineId}/mark-picked`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                alert(`${itemCode} marked as picked successfully!`);
+                location.reload();
+            } else {
+                alert(`Error marking line as picked: ${result.error || 'Unknown error'}`);
+                // Restore button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error marking line as picked:', error);
+            alert('Error marking line as picked');
+            // Restore button
+            const button = event.target;
+            button.innerHTML = originalText;
             button.disabled = false;
         }
     }

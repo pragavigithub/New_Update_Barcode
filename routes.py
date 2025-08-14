@@ -2085,6 +2085,106 @@ def mark_pick_list_as_picked(pick_list_id):
         logging.error(f"Error marking pick list as picked: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/pick-list/line/<int:absolute_entry>/mark-picked', methods=['PATCH'])
+@login_required
+def mark_pick_list_line_as_picked(absolute_entry):
+    """Mark individual pick list line as picked by sending PATCH request to SAP B1"""
+    if not current_user.has_permission('pick_list'):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        line_number = data.get('line_number')
+        item_code = data.get('item_code')
+        picked_quantity = data.get('picked_quantity', 0)
+        
+        if line_number is None:
+            return jsonify({'success': False, 'error': 'Line number is required'}), 400
+        
+        # Get the pick list from database using absolute_entry
+        pick_list = PickList.query.filter_by(absolute_entry=absolute_entry).first()
+        if not pick_list:
+            return jsonify({'success': False, 'error': 'Pick list not found'}), 404
+        
+        # Check access permissions
+        if pick_list.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied - You can only modify your own pick lists'}), 403
+        
+        # Initialize SAP integration and update line status
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        
+        # Get current pick list data from SAP to build proper PATCH payload
+        sap_result = sap.get_pick_list_by_id(absolute_entry)
+        if not sap_result.get('success'):
+            return jsonify({'success': False, 'error': 'Failed to get pick list data from SAP'}), 500
+        
+        sap_pick_list = sap_result['pick_list']
+        
+        # Prepare data for line-level pick
+        line_pick_data = {
+            'line_number': line_number,
+            'item_code': item_code,
+            'picked_quantity': float(picked_quantity),
+            'sap_pick_list': sap_pick_list
+        }
+        
+        result = sap.update_pick_list_line_to_picked(absolute_entry, line_pick_data)
+        
+        if result.get('success'):
+            # Update local database - find and update the specific line
+            from models import PickListLine
+            local_line = PickListLine.query.filter_by(
+                pick_list_id=pick_list.id,
+                line_number=line_number
+            ).first()
+            
+            if local_line:
+                local_line.pick_status = 'ps_Picked'
+                local_line.picked_quantity = float(picked_quantity)
+            
+            # Check if pick list is fully picked or partially picked
+            all_lines_picked = True
+            any_line_picked = False
+            
+            for line in sap_pick_list.get('PickListsLines', []):
+                if line.get('LineNumber') == line_number:
+                    # This line is now picked
+                    any_line_picked = True
+                elif line.get('PickStatus') == 'ps_Picked':
+                    any_line_picked = True
+                elif line.get('PickStatus') != 'ps_Picked':
+                    all_lines_picked = False
+            
+            # Update pick list status based on line statuses
+            if all_lines_picked:
+                pick_list.status = 'ps_Picked'
+            elif any_line_picked:
+                pick_list.status = 'ps_PartiallyPicked'
+            
+            db.session.commit()
+            
+            logging.info(f"Pick list line {line_number} (Item: {item_code}) marked as picked successfully")
+            
+            return jsonify({
+                'success': True,
+                'message': result.get('message', f'Line {line_number} marked as picked successfully'),
+                'line_number': line_number,
+                'item_code': item_code,
+                'pick_list_status': pick_list.status,
+                'absolute_entry': absolute_entry
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Failed to update pick list line in SAP B1')
+            }), 500
+            
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error marking pick list line as picked: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/pick_list/<int:pick_list_id>/reject', methods=['POST'])
 @login_required
 def reject_pick_list(pick_list_id):

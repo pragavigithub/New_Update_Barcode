@@ -2005,6 +2005,117 @@ class SAPIntegration:
                 'error': error_msg
             }
 
+    def update_pick_list_line_to_picked(self, absolute_entry, line_pick_data):
+        """Update specific pick list line to 'ps_Picked' in SAP B1 via PATCH API"""
+        if not self.ensure_logged_in():
+            # Return success for offline mode with mock response
+            return {
+                'success': True,
+                'message': f'Pick list line {line_pick_data.get("line_number")} marked as picked (offline mode)',
+                'sap_response': {'Absoluteentry': absolute_entry, 'LineStatus': 'ps_Picked'}
+            }
+
+        try:
+            # Build the PATCH URL with the absolute entry
+            url = f"{self.base_url}/b1s/v1/PickLists({absolute_entry})"
+            
+            # Get original pick list data
+            sap_pick_list = line_pick_data.get('sap_pick_list', {})
+            target_line_number = line_pick_data.get('line_number')
+            picked_quantity = line_pick_data.get('picked_quantity', 0)
+            
+            # Prepare the JSON payload with exact structure, updating only the target line
+            payload = {
+                "Absoluteentry": absolute_entry,
+                "Name": sap_pick_list.get('Name', 'manager'),
+                "OwnerCode": sap_pick_list.get('OwnerCode', 1),
+                "OwnerName": sap_pick_list.get('OwnerName'),
+                "PickDate": sap_pick_list.get('PickDate', datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')),
+                "Remarks": sap_pick_list.get('Remarks'),
+                "ObjectType": sap_pick_list.get('ObjectType', '156'),
+                "UseBaseUnits": sap_pick_list.get('UseBaseUnits', 'tNO'),
+                "PickListsLines": []
+            }
+            
+            # Calculate overall pick list status
+            all_lines_picked = True
+            any_line_picked = False
+            
+            # Add all pick list lines, updating the target line
+            for line in sap_pick_list.get('PickListsLines', []):
+                line_data = {
+                    "AbsoluteEntry": absolute_entry,
+                    "LineNumber": line.get('LineNumber', 0),
+                    "OrderEntry": line.get('OrderEntry'),
+                    "OrderRowID": line.get('OrderRowID'),
+                    "BaseObjectType": line.get('BaseObjectType', 17),
+                    "SerialNumbers": [],
+                    "BatchNumbers": [],
+                    "DocumentLinesBinAllocations": []
+                }
+                
+                # Update the target line
+                if line.get('LineNumber') == target_line_number:
+                    line_data["PickedQuantity"] = float(picked_quantity)
+                    line_data["PickStatus"] = "ps_Picked"
+                    line_data["ReleasedQuantity"] = float(line.get('ReleasedQuantity', picked_quantity))
+                    line_data["PreviouslyReleasedQuantity"] = float(line.get('PreviouslyReleasedQuantity', 0))
+                    any_line_picked = True
+                else:
+                    # Keep original line data
+                    line_data["PickedQuantity"] = float(line.get('PickedQuantity', 0))
+                    line_data["PickStatus"] = line.get('PickStatus', 'ps_Released')
+                    line_data["ReleasedQuantity"] = float(line.get('ReleasedQuantity', 0))
+                    line_data["PreviouslyReleasedQuantity"] = float(line.get('PreviouslyReleasedQuantity', 0))
+                    
+                    # Check if this line is picked
+                    if line.get('PickStatus') == 'ps_Picked':
+                        any_line_picked = True
+                    elif line.get('PickStatus') != 'ps_Picked':
+                        all_lines_picked = False
+                
+                payload["PickListsLines"].append(line_data)
+            
+            # Determine overall pick list status
+            if all_lines_picked and any_line_picked:
+                payload["Status"] = "ps_Picked"
+            elif any_line_picked:
+                payload["Status"] = "ps_PartiallyPicked"
+            else:
+                payload["Status"] = sap_pick_list.get('Status', 'ps_Open')
+            
+            # Execute PATCH request to SAP B1
+            logging.info(f"Sending PATCH request to {url} for line {target_line_number}")
+            logging.info(f"Payload: {json.dumps(payload, indent=2)}")
+            
+            response = self.session.patch(url, json=payload, timeout=30)
+            
+            if response.status_code == 204:
+                # SAP B1 returns 204 No Content for successful PATCH
+                logging.info(f"Successfully marked pick list line {target_line_number} as picked in SAP B1")
+                return {
+                    'success': True,
+                    'message': f'Pick list line {target_line_number} marked as picked successfully',
+                    'sap_response': {'Absoluteentry': absolute_entry, 'LineStatus': 'ps_Picked'},
+                    'overall_status': payload["Status"]
+                }
+            else:
+                error_msg = f"SAP B1 PATCH failed with status {response.status_code}: {response.text}"
+                logging.error(error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'sap_response': response.text
+                }
+                
+        except Exception as e:
+            error_msg = f"Error updating pick list line status in SAP B1: {str(e)}"
+            logging.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg
+            }
+
     def get_warehouse_business_place_id(self, warehouse_code):
         """Get BusinessPlaceID for a warehouse from SAP B1"""
         if not self.ensure_logged_in():
