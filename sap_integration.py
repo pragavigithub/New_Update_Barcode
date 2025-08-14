@@ -1270,15 +1270,21 @@ class SAPIntegration:
                             {
                                 "AbsoluteEntry": 613,
                                 "LineNumber": 0,
-                                "OrderEntry": 1236,
-                                "OrderRowID": 0,
-                                "PickedQuantity": 42000.0,
+                                "OrderEntry": 1238,
+                                "OrderRowID": 1,
+                                "PickedQuantity": 0.0,
                                 "PickStatus": "ps_Released",
-                                "ReleasedQuantity": 42000.0,
+                                "ReleasedQuantity": 113.0,
                                 "PreviouslyReleasedQuantity": 0.0,
                                 "BaseObjectType": 17,
                                 "SerialNumbers": [],
                                 "BatchNumbers": [],
+                                "enhanced_data": {
+                                    "ItemCode": "ITEM-001",
+                                    "WarehouseCode": "7000-FG",
+                                    "Customer": "Test Customer",
+                                    "ItemDescription": "Sample Item Description"
+                                },
                                 "DocumentLinesBinAllocations": [
                                     {
                                         "BinAbsEntry": 1,
@@ -1303,50 +1309,22 @@ class SAPIntegration:
                             {
                                 "AbsoluteEntry": 613,
                                 "LineNumber": 1,
-                                "OrderEntry": 1236,
-                                "OrderRowID": 1,
-                                "PickedQuantity": 30000.0,
-                                "PickStatus": "ps_Released",
-                                "ReleasedQuantity": 30000.0,
-                                "PreviouslyReleasedQuantity": 0.0,
-                                "BaseObjectType": 17,
-                                "SerialNumbers": [],
-                                "BatchNumbers": [],
-                                "DocumentLinesBinAllocations": [
-                                    {
-                                        "BinAbsEntry": 1,
-                                        "Quantity": 1000.0,
-                                        "AllowNegativeQuantity": "tNO",
-                                        "SerialAndBatchNumbersBaseLine": 0,
-                                        "BaseLineNumber": 1,
-                                        "Warehouse": "7000-FG",
-                                        "BinCode": "7000-FG-SYSTEM-BIN-LOCATION"
-                                    }
-                                ]
-                            },
-                            {
-                                "AbsoluteEntry": 613,
-                                "LineNumber": 2,
-                                "OrderEntry": 1236,
+                                "OrderEntry": 1238,
                                 "OrderRowID": 2,
-                                "PickedQuantity": 50000.0,
+                                "PickedQuantity": 0.0,
                                 "PickStatus": "ps_Released",
-                                "ReleasedQuantity": 50000.0,
+                                "ReleasedQuantity": 156.0,
                                 "PreviouslyReleasedQuantity": 0.0,
                                 "BaseObjectType": 17,
                                 "SerialNumbers": [],
                                 "BatchNumbers": [],
-                                "DocumentLinesBinAllocations": [
-                                    {
-                                        "BinAbsEntry": 1,
-                                        "Quantity": 1000.0,
-                                        "AllowNegativeQuantity": "tNO",
-                                        "SerialAndBatchNumbersBaseLine": 0,
-                                        "BaseLineNumber": 2,
-                                        "Warehouse": "7000-FG",
-                                        "BinCode": "7000-FG-SYSTEM-BIN-LOCATION"
-                                    }
-                                ]
+                                "enhanced_data": {
+                                    "ItemCode": "ITEM-002",
+                                    "WarehouseCode": "8000-WH",
+                                    "Customer": "Another Customer",
+                                    "ItemDescription": "Another Item Description"
+                                },
+                                "DocumentLinesBinAllocations": []
                             }
                         ]
                     }

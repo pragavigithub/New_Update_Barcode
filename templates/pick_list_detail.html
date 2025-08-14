@@ -137,7 +137,7 @@
                         <thead>
                             <tr>
                                 <th>Line #</th>
-                                <th>Order Entry</th>
+                                <th>Item Code</th>
                                 <th>Row ID</th>
                                 <th>Picked Qty</th>
                                 <th>Released Qty</th>
@@ -150,7 +150,7 @@
                             {% for line in sap_pick_list.PickListsLines %}
                             <tr>
                                 <td><strong>{{ line.LineNumber }}</strong></td>
-                                <td>{{ line.OrderEntry }}</td>
+                                <td>{{ line.enhanced_data.ItemCode if line.enhanced_data and line.enhanced_data.ItemCode else line.OrderEntry }}</td>
                                 <td>{{ line.OrderRowID }}</td>
                                 <td><span class="badge bg-success">{{ "{:,.0f}".format(line.PickedQuantity) }}</span></td>
                                 <td>{{ "{:,.0f}".format(line.ReleasedQuantity) }}</td>
@@ -171,7 +171,18 @@
                                         <i data-feather="map-pin"></i> {{ line.DocumentLinesBinAllocations|length }} Bins
                                     </button>
                                     {% else %}
-                                    <span class="text-muted">No bins</span>
+                                    <span class="badge bg-warning">
+                                        {% if line.enhanced_data and line.enhanced_data.WarehouseCode %}
+                                            {{ line.enhanced_data.WarehouseCode }}
+                                        {% else %}
+                                            No bins
+                                        {% endif %}
+                                    </span>
+                                    {% endif %}
+                                        {% else %}
+                                            No bins
+                                        {% endif %}
+                                    </span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -267,7 +278,7 @@
                         <thead>
                             <tr>
                                 <th>Line #</th>
-                                <th>Order Entry</th>
+                                <th>Item Code</th>
                                 <th>Picked Qty</th>
                                 <th>Released Qty</th>
                                 <th>Previously Released</th>
@@ -280,7 +291,7 @@
                             {% for line in pick_list_lines %}
                             <tr>
                                 <td><strong>{{ line.line_number }}</strong></td>
-                                <td>{{ line.order_entry }}</td>
+                                <td>{{ line.item_code if line.item_code else line.order_entry }}</td>
                                 <td><span class="badge bg-success">{{ "{:,.0f}".format(line.picked_quantity) }}</span></td>
                                 <td>{{ "{:,.0f}".format(line.released_quantity) }}</td>
                                 <td>{{ "{:,.0f}".format(line.previously_released_quantity) }}</td>
