@@ -402,7 +402,7 @@ BACKUP_PATH=backups/
                     branch_id VARCHAR(10),
                     branch_name VARCHAR(100),
                     default_branch_id VARCHAR(10),
-                    user_is_active BOOLEAN DEFAULT TRUE,
+                    is_active BOOLEAN DEFAULT TRUE,
                     must_change_password BOOLEAN DEFAULT FALSE,
                     last_login DATETIME,
                     permissions TEXT,

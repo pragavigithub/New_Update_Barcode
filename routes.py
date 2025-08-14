@@ -332,7 +332,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
-            if user.user_is_active:
+            if user.is_active:
                 # Update branch - use provided branch, default branch, or 'HQ001'
                 if branch_id:
                     user.branch_id = branch_id
@@ -2672,6 +2672,65 @@ def change_password():
         return redirect(url_for('dashboard'))
     
     return render_template('change_password.html')
+
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if not (current_user.role == 'admin' or current_user.has_permission('user_management')):
+        flash('Access denied. You do not have permission to delete users.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Prevent self-deletion
+    if user.id == current_user.id:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('user_management'))
+    
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+    
+    flash(f'User {username} deleted successfully!', 'success')
+    return redirect(url_for('user_management'))
+
+@app.route('/activate_user/<int:user_id>', methods=['POST'])
+@login_required
+def activate_user(user_id):
+    if not (current_user.role == 'admin' or current_user.has_permission('user_management')):
+        flash('Access denied. You do not have permission to activate users.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    user.is_active = True
+    user.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    flash(f'User {user.username} activated successfully!', 'success')
+    return redirect(url_for('user_management'))
+
+@app.route('/deactivate_user/<int:user_id>', methods=['POST'])
+@login_required  
+def deactivate_user(user_id):
+    if not (current_user.role == 'admin' or current_user.has_permission('user_management')):
+        flash('Access denied. You do not have permission to deactivate users.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Prevent self-deactivation
+    if user.id == current_user.id:
+        flash('You cannot deactivate your own account.', 'error')
+        return redirect(url_for('user_management'))
+    
+    user.is_active = False
+    user.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    flash(f'User {user.username} deactivated successfully!', 'success')
+    return redirect(url_for('user_management'))
 
 @app.route('/branch_management')
 @login_required

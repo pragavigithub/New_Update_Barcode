@@ -457,72 +457,61 @@ document.getElementById('editUserForm').addEventListener('submit', function(e) {
     updateUser(userData);
 });
 
-async function editUser(userId) {
-    try {
-        const response = await fetch(`/api/get_user/${userId}`);
-        const data = await response.json();
-        
-        if (data.success) {
-            const user = data.user;
-            
-            // Populate edit form
-            document.getElementById('edit_user_id').value = user.id;
-            document.getElementById('edit_username').value = user.username;
-            document.getElementById('edit_email').value = user.email;
-            document.getElementById('edit_first_name').value = user.first_name;
-            document.getElementById('edit_last_name').value = user.last_name;
-            document.getElementById('edit_role').value = user.role;
-            document.getElementById('edit_branch_id').value = user.branch_id || '';
-            document.getElementById('edit_is_active').checked = user.is_active;
-            
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
-            modal.show();
-        } else {
-            alert('Error loading user details');
-        }
-    } catch (error) {
-        console.error('Error loading user:', error);
-        alert('Error loading user details');
+function editUser(userId) {
+    // Navigate to edit user page
+    window.location.href = `/edit_user/${userId}`;
+}
+
+function deleteUser(userId) {
+    if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/delete_user/${userId}`;
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 
-async function updateUser(userData) {
-    try {
-        const response = await fetch('/api/update_user', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(userData)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            alert('User updated successfully');
-            
-            // Close modal and reload page
-            const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
-            modal.hide();
-            location.reload();
-        } else {
-            alert('Error updating user: ' + result.error);
-        }
-    } catch (error) {
-        console.error('Error updating user:', error);
-        alert('Error updating user');
+function activateUser(userId) {
+    if (confirm('Are you sure you want to activate this user?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/activate_user/${userId}`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function deactivateUser(userId) {
+    if (confirm('Are you sure you want to deactivate this user?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/deactivate_user/${userId}`;
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 
 function resetPassword(userId) {
-    document.getElementById('reset_user_id').value = userId;
-    document.getElementById('new_password').value = '';
-    document.getElementById('confirm_new_password').value = '';
-    document.getElementById('force_password_change').checked = false;
-    
-    const modal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
-    modal.show();
+    const newPassword = prompt('Enter new password for the user (minimum 6 characters):');
+    if (newPassword && newPassword.length >= 6) {
+        if (confirm('Are you sure you want to reset this user\'s password?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/reset_password/${userId}`;
+            
+            const passwordInput = document.createElement('input');
+            passwordInput.type = 'hidden';
+            passwordInput.name = 'new_password';
+            passwordInput.value = newPassword;
+            
+            form.appendChild(passwordInput);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    } else if (newPassword !== null) {
+        alert('Password must be at least 6 characters long.');
+    }
 }
 
 async function resetUserPassword(userId, newPassword) {

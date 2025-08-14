@@ -20,7 +20,7 @@ class User(UserMixin, db.Model):
     branch_name = db.Column(db.String(100), nullable=True)
     default_branch_id = db.Column(
         db.String(10), nullable=True)  # Default branch if none selected
-    user_is_active = db.Column(db.Boolean, default=True)
+    is_active = db.Column(db.Boolean, default=True)
     must_change_password = db.Column(
         db.Boolean, default=False)  # Force password change on next login
     last_login = db.Column(db.DateTime, nullable=True)
