@@ -1934,7 +1934,11 @@ def create_pick_list():
     
     # Generate proper pick list number if not provided
     if not pick_list_number:
-        pick_list_number = DocumentNumberSeries.get_next_number('PICKLIST')
+        try:
+            pick_list_number = DocumentNumberSeries.get_next_number('PICKLIST')
+        except:
+            # Fallback if DocumentNumberSeries fails
+            pick_list_number = f"PL-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
     
     # Use SAP sales order number or generate one if not provided  
     if not sales_order_number and absolute_entry:
