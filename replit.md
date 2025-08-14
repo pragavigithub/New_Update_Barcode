@@ -47,6 +47,10 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - Added ItemDescription and Customer details in enhanced picklist lines
 - Improved bin allocation display to show warehouse details even when no bin allocations exist
 - Confirmed picklist enhancement displays ItemCode by matching OrderEntry to Sales Order DocEntry and OrderRowID to LineNum
+- **Enhanced InventoryTransferRequest module**: Added LineStatus checking to conditionally display "Add Remaining" buttons
+- Updated template to hide "Add Remaining" button when LineStatus is "bost_Close" and show proper status indicators
+- Added Status column to InventoryTransferRequest line items table displaying Open/Closed status with appropriate badges
+- Enhanced transfer creation logic to properly track and log open vs closed line items
 
 ## User Preferences
 - None specified yet

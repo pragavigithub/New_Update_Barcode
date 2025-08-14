@@ -169,6 +169,7 @@
                                     <th>UoM</th>
                                     <th>From Warehouse</th>
                                     <th>To Warehouse</th>
+                                    <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -190,7 +191,20 @@
                                     <td>{{ item.FromWarehouseCode or item.from_warehouse_code or transfer.from_warehouse }}</td>
                                     <td>{{ item.ToWarehouseCode or item.to_warehouse_code or transfer.to_warehouse }}</td>
                                     <td>
-                                        {% if (item.RemainingQuantity or (item.Quantity or item.quantity)) > 0 %}
+                                        {% if item.LineStatus == 'bost_Close' %}
+                                            <span class="badge bg-danger">Closed</span>
+                                        {% elif item.LineStatus == 'bost_Open' %}
+                                            <span class="badge bg-success">Open</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">{{ item.LineStatus or 'Unknown' }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.LineStatus == 'bost_Close' %}
+                                            <span class="badge bg-secondary">
+                                                <i data-feather="lock"></i> Closed
+                                            </span>
+                                        {% elif (item.RemainingQuantity or (item.Quantity or item.quantity)) > 0 %}
                                         <button class="btn btn-sm btn-success" 
                                             onclick="addItemFromRequest('{{ item.ItemCode or item.item_code }}', 
                                                                         '{{ item.ItemDescription or item.item_description or item.ItemName or item.item_name }}', 

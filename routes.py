@@ -1014,13 +1014,16 @@ def create_inventory_transfer():
         flash(f'Transfer request {transfer_request_number} is closed or not available for processing. Status: {doc_status}', 'error')
         return redirect(url_for('inventory_transfer'))
     
-    # Check if there are any open line items
+    # Check if there are any open line items (exclude closed lines)
     stock_transfer_lines = transfer_data.get('StockTransferLines', [])
-    open_lines = [line for line in stock_transfer_lines if line.get('LineStatus', '').lower() in ['open', 'bost_open', 'o'] or not line.get('LineStatus')]
+    open_lines = [line for line in stock_transfer_lines if line.get('LineStatus', '') != 'bost_Close']
+    closed_lines = [line for line in stock_transfer_lines if line.get('LineStatus', '') == 'bost_Close']
+    
+    logging.info(f"📊 Transfer request {transfer_request_number}: Total lines: {len(stock_transfer_lines)}, Open lines: {len(open_lines)}, Closed lines: {len(closed_lines)}")
     
     if not open_lines:
         logging.error(f"❌ Transfer request {transfer_request_number} has no open line items")
-        flash(f'Transfer request {transfer_request_number} has no open line items available for processing.', 'error')
+        flash(f'Transfer request {transfer_request_number} has no open line items available for processing. All {len(closed_lines)} lines are closed.', 'error')
         return redirect(url_for('inventory_transfer'))
     
     # Extract warehouse information
@@ -1069,6 +1072,8 @@ def inventory_transfer_detail(transfer_id):
                 requested_qty = float(line.get('Quantity', 0))
                 line['RemainingQuantity'] = requested_qty
                 line['TransferredQuantity'] = 0
+                # Ensure LineStatus is passed to template for proper closed/open display
+                line['LineStatus'] = line.get('LineStatus', 'bost_Open')
                 available_items.append(line)
 
             logging.info(f"Found {len(available_items)} items available for fresh transfer request {transfer.transfer_request_number}")
