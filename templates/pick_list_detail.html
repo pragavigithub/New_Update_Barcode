@@ -142,7 +142,7 @@
                                 <th>Picked Qty</th>
                                 <th>Released Qty</th>
                                 <th>Status</th>
-                                <th>Bin Allocations</th>
+<!--                                <th>Bin Allocations</th>-->
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -181,21 +181,21 @@
                                         <span class="badge bg-secondary">{{ line.PickStatus }}</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if line.DocumentLinesBinAllocations %}
-                                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" 
-                                            data-bs-target="#binDetails{{ loop.index0 }}" 
-                                            aria-expanded="false">
-                                        <i data-feather="map-pin"></i> {{ line.DocumentLinesBinAllocations|length }} Bins
-                                    </button>
-                                    {% else %}
-                                    <button class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" 
-                                            data-bs-target="#binDetails{{ loop.index0 }}" 
-                                            aria-expanded="false">
-                                        <i data-feather="map-pin"></i> 1 Bins
-                                    </button>
-                                    {% endif %}
-                                </td>
+<!--                                <td>-->
+<!--                                    {% if line.DocumentLinesBinAllocations %}-->
+<!--                                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" -->
+<!--                                            data-bs-target="#binDetails{{ loop.index0 }}" -->
+<!--                                            aria-expanded="false">-->
+<!--                                        <i data-feather="map-pin"></i> {{ line.DocumentLinesBinAllocations|length }} Bins-->
+<!--                                    </button>-->
+<!--                                    {% else %}-->
+<!--                                    <button class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse"-->
+<!--                                            data-bs-target="#binDetails{{ loop.index0 }}"-->
+<!--                                            aria-expanded="false">-->
+<!--                                        <i data-feather="map-pin"></i> {{ line.BinCode or 'Unknown' }}-->
+<!--                                    </button>-->
+<!--                                    {% endif %}-->
+<!--                                </td>-->
                                 <td>
                                     <button class="btn btn-sm btn-outline-primary" onclick="viewLineDetails({{ line.LineNumber }})">
                                         <i data-feather="eye"></i>
@@ -215,7 +215,7 @@
                                                         <th>Bin Code</th>
                                                         <th>Quantity</th>
                                                         <th>Allow Negative</th>
-                                                        <th>Base Line</th>
+<!--                                                        <th>Base Line</th>-->
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -232,17 +232,17 @@
                                                                     <span class="text-success"><i data-feather="check"></i> Yes</span>
                                                                 {% endif %}
                                                             </td>
-                                                            <td>{{ bin_alloc.BaseLineNumber }}</td>
+<!--                                                            <td>{{ bin_alloc.BaseLineNumber }}</td>-->
                                                         </tr>
                                                         {% endfor %}
                                                     {% else %}
                                                         <!-- Show default warehouse/bin when no allocations exist -->
                                                         <tr>
                                                             <td><span class="badge bg-info">{{ line.WarehouseCode or 'Unknown' }}</span></td>
-                                                            <td><span class="badge bg-primary">Bin-1</span></td>
+                                                            <td><span class="badge bg-primary">{{ line.BinCode or 'Unknown' }}</span></td>
                                                             <td>{{ "{:,.0f}".format(line.ReleasedQuantity) }}</td>
                                                             <td><span class="text-danger"><i data-feather="x"></i> No</span></td>
-                                                            <td>{{ line.LineNumber }}</td>
+<!--                                                            <td>{{ line.LineNumber }}</td>-->
                                                         </tr>
                                                     {% endif %}
                                                 </tbody>
