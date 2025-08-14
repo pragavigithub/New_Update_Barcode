@@ -1980,26 +1980,6 @@ def create_pick_list():
         flash('Pick list created but SAP B1 sync failed', 'warning')
     
     return redirect(url_for('pick_list_detail', pick_list_id=pick_list.id))
-    
-    db.session.add(pick_list)
-    db.session.commit()
-    
-    # Try to sync the pick list details from SAP B1 
-    try:
-        if absolute_entry:
-            from sap_integration import sync_pick_list_to_local_db
-            sync_result = sync_pick_list_to_local_db(int(absolute_entry))
-            if sync_result:
-                flash('Pick list created and synced with SAP B1 successfully', 'success')
-            else:
-                flash('Pick list created but SAP B1 sync failed', 'warning')
-        else:
-            flash('Pick list created successfully', 'success')
-    except Exception as e:
-        logging.error(f"Error syncing pick list: {str(e)}")
-        flash('Pick list created but SAP B1 sync failed', 'warning')
-    
-    return redirect(url_for('pick_list_detail', pick_list_id=pick_list.id))
 
 @app.route('/pick_list/<int:pick_list_id>/approve', methods=['POST'])
 @login_required
@@ -2015,6 +1995,94 @@ def approve_pick_list(pick_list_id):
         flash('You do not have permission to approve pick lists.', 'error')
     
     return redirect(url_for('pick_list_detail', pick_list_id=pick_list_id))
+
+@app.route('/api/pick-list/<int:pick_list_id>/mark-picked', methods=['PATCH'])
+@login_required
+def mark_pick_list_as_picked(pick_list_id):
+    """Mark pick list as picked by sending PATCH request to SAP B1"""
+    if not current_user.has_permission('pick_list'):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        absolute_entry = data.get('absolute_entry')
+        
+        if not absolute_entry:
+            return jsonify({'success': False, 'error': 'Absolute entry is required'}), 400
+        
+        # Get the pick list from database
+        pick_list = PickList.query.get_or_404(pick_list_id)
+        
+        # Check access permissions
+        if pick_list.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied - You can only modify your own pick lists'}), 403
+        
+        # Get pick list lines for the PATCH payload
+        pick_list_lines = PickListLine.query.filter_by(pick_list_id=pick_list.id).all()
+        
+        # Prepare pick list data for SAP integration
+        pick_list_data = {
+            'name': pick_list.name or 'manager',
+            'owner_code': pick_list.owner_code or 1,
+            'owner_name': pick_list.owner_name,
+            'pick_date': pick_list.pick_date.strftime('%Y-%m-%dT%H:%M:%SZ') if pick_list.pick_date else datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'remarks': pick_list.remarks,
+            'object_type': pick_list.object_type or '156',
+            'use_base_units': pick_list.use_base_units or 'tNO',
+            'lines': []
+        }
+        
+        # Add line data
+        for line in pick_list_lines:
+            line_data = {
+                'line_number': line.line_number,
+                'order_entry': line.order_entry,
+                'order_row_id': line.order_row_id,
+                'picked_quantity': line.picked_quantity or line.released_quantity,  # Use released quantity if picked is 0
+                'released_quantity': line.released_quantity,
+                'previously_released_quantity': line.previously_released_quantity,
+                'base_object_type': line.base_object_type or 17
+            }
+            pick_list_data['lines'].append(line_data)
+        
+        # Initialize SAP integration and update status
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        
+        result = sap.update_pick_list_status_to_picked(absolute_entry, pick_list_data)
+        
+        if result.get('success'):
+            # Update local database status
+            pick_list.status = 'ps_Picked'
+            
+            # Update line statuses locally
+            for line in pick_list_lines:
+                line.pick_status = 'ps_Picked'
+                # Set picked quantity to released quantity if not already set
+                if not line.picked_quantity or line.picked_quantity == 0:
+                    line.picked_quantity = line.released_quantity
+            
+            db.session.commit()
+            
+            logging.info(f"Pick list {pick_list_id} (SAP Entry: {absolute_entry}) marked as picked successfully")
+            
+            return jsonify({
+                'success': True,
+                'message': result.get('message', 'Pick list marked as picked successfully'),
+                'pick_list_id': pick_list_id,
+                'absolute_entry': absolute_entry,
+                'updated_lines': len(pick_list_lines)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Failed to update pick list in SAP B1')
+            }), 500
+            
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error marking pick list as picked: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/pick_list/<int:pick_list_id>/reject', methods=['POST'])
 @login_required

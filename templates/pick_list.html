@@ -130,6 +130,8 @@
                                         <span class="badge bg-primary">Open</span>
                                     {% elif pick_list.status == 'ps_Closed' %}
                                         <span class="badge bg-success">Closed</span>
+                                    {% elif pick_list.status == 'ps_Picked' %}
+                                        <span class="badge bg-info">Picked</span>
                                     {% else %}
                                         <span class="badge bg-secondary">{{ pick_list.status or 'Unknown' }}</span>
                                     {% endif %}

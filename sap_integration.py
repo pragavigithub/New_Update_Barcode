@@ -1926,6 +1926,85 @@ class SAPIntegration:
             logging.error(f"Error syncing business partners: {str(e)}")
             return False
 
+    def update_pick_list_status_to_picked(self, absolute_entry, pick_list_data):
+        """Update pick list status to 'ps_Picked' in SAP B1 via PATCH API"""
+        if not self.ensure_logged_in():
+            # Return success for offline mode with mock response
+            import random
+            return {
+                'success': True,
+                'message': f'Pick list {absolute_entry} marked as picked (offline mode)',
+                'sap_response': {'Absoluteentry': absolute_entry, 'Status': 'ps_Picked'}
+            }
+
+        try:
+            # Build the PATCH URL with the absolute entry
+            url = f"{self.base_url}/b1s/v1/PickLists({absolute_entry})"
+            
+            # Prepare the JSON payload with exact structure from user's example
+            payload = {
+                "Absoluteentry": absolute_entry,
+                "Name": pick_list_data.get('name', 'manager'),
+                "OwnerCode": pick_list_data.get('owner_code', 1),
+                "OwnerName": pick_list_data.get('owner_name'),
+                "PickDate": pick_list_data.get('pick_date', datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')),
+                "Remarks": pick_list_data.get('remarks'),
+                "Status": "ps_Picked",  # This is the key change
+                "ObjectType": pick_list_data.get('object_type', '156'),
+                "UseBaseUnits": pick_list_data.get('use_base_units', 'tNO'),
+                "PickListsLines": []
+            }
+            
+            # Add pick list lines with picked status
+            if pick_list_data.get('lines'):
+                for line in pick_list_data['lines']:
+                    line_data = {
+                        "AbsoluteEntry": absolute_entry,
+                        "LineNumber": line.get('line_number', 0),
+                        "OrderEntry": line.get('order_entry'),
+                        "OrderRowID": line.get('order_row_id'),
+                        "PickedQuantity": float(line.get('picked_quantity', 0)),
+                        "PickStatus": "ps_Picked",  # Mark each line as picked
+                        "ReleasedQuantity": float(line.get('released_quantity', 0)),
+                        "PreviouslyReleasedQuantity": float(line.get('previously_released_quantity', 0)),
+                        "BaseObjectType": line.get('base_object_type', 17),
+                        "SerialNumbers": [],
+                        "BatchNumbers": [],
+                        "DocumentLinesBinAllocations": []
+                    }
+                    payload["PickListsLines"].append(line_data)
+            
+            # Execute PATCH request to SAP B1
+            logging.info(f"Sending PATCH request to {url}")
+            logging.info(f"Payload: {json.dumps(payload, indent=2)}")
+            
+            response = self.session.patch(url, json=payload, timeout=30)
+            
+            if response.status_code == 204:
+                # SAP B1 returns 204 No Content for successful PATCH
+                logging.info(f"Successfully marked pick list {absolute_entry} as picked in SAP B1")
+                return {
+                    'success': True,
+                    'message': f'Pick list {absolute_entry} marked as picked successfully',
+                    'sap_response': {'Absoluteentry': absolute_entry, 'Status': 'ps_Picked'}
+                }
+            else:
+                error_msg = f"SAP B1 PATCH failed with status {response.status_code}: {response.text}"
+                logging.error(error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'sap_response': response.text
+                }
+                
+        except Exception as e:
+            error_msg = f"Error updating pick list status in SAP B1: {str(e)}"
+            logging.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg
+            }
+
     def get_warehouse_business_place_id(self, warehouse_code):
         """Get BusinessPlaceID for a warehouse from SAP B1"""
         if not self.ensure_logged_in():

@@ -21,6 +21,13 @@
                     <i data-feather="x"></i> Reject
                 </button>
                 {% endif %}
+                
+                {% if pick_list.absolute_entry and pick_list.status in ['ps_Open', 'approved'] %}
+                <button class="btn btn-primary ms-2" onclick="markAsPicked({{ pick_list.id }}, {{ pick_list.absolute_entry }})">
+                    <i data-feather="package"></i> Mark as Picked
+                </button>
+                {% endif %}
+                
                 <a href="{{ url_for('pick_list') }}" class="btn btn-outline-secondary ms-2">
                     <i data-feather="arrow-left"></i> Back to Pick Lists
                 </a>
@@ -55,6 +62,8 @@
                                 <span class="badge bg-primary">SAP Open</span>
                             {% elif pick_list.status == 'ps_Closed' %}
                                 <span class="badge bg-success">SAP Closed</span>
+                            {% elif pick_list.status == 'ps_Picked' %}
+                                <span class="badge bg-info">SAP Picked</span>
                             {% else %}
                                 <span class="badge bg-secondary">{{ pick_list.status }}</span>
                             {% endif %}
@@ -504,6 +513,47 @@ async function rejectPickList(pickListId) {
         } catch (error) {
             console.error('Error rejecting pick list:', error);
             alert('Error rejecting pick list');
+        }
+    }
+}
+
+async function markAsPicked(pickListId, absoluteEntry) {
+    if (confirm('Are you sure you want to mark this pick list as picked? This will update the status in SAP B1.')) {
+        try {
+            // Show loading indicator
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i data-feather="loader" class="spinner"></i> Processing...';
+            button.disabled = true;
+            
+            const response = await fetch(`/api/pick-list/${pickListId}/mark-picked`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    absolute_entry: absoluteEntry
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                alert('Pick list marked as picked successfully!');
+                location.reload();
+            } else {
+                alert(`Error marking pick list as picked: ${result.error || 'Unknown error'}`);
+                // Restore button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error marking pick list as picked:', error);
+            alert('Error marking pick list as picked');
+            // Restore button
+            const button = event.target;
+            button.innerHTML = '<i data-feather="package"></i> Mark as Picked';
+            button.disabled = false;
         }
     }
 }
