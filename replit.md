@@ -42,8 +42,10 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - Enhanced picklist lines now display item details from matching Sales Orders based on OrderEntry and LineNum
 - **2025-08-14**: Successfully migrated from Replit Agent to Replit environment
 - Configured PostgreSQL database for Replit cloud environment
-- Verified all existing functionality works including Sales Order ItemCode display in picklists
-- Updated MySQL migration to ensure compatibility with PostgreSQL fallback system
+- **Enhanced Picklist module**: Fixed ItemCode display issue in Pick List Items table
+- Updated template to show ItemCode instead of OrderEntry number for better user experience
+- Added ItemDescription and Customer details in enhanced picklist lines
+- Improved bin allocation display to show warehouse details even when no bin allocations exist
 - Confirmed picklist enhancement displays ItemCode by matching OrderEntry to Sales Order DocEntry and OrderRowID to LineNum
 
 ## User Preferences

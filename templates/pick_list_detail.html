@@ -189,13 +189,11 @@
                                         <i data-feather="map-pin"></i> {{ line.DocumentLinesBinAllocations|length }} Bins
                                     </button>
                                     {% else %}
-                                    <span class="badge bg-warning">
-                                        {% if line.WarehouseCode %}
-                                            {{ line.WarehouseCode }}
-                                        {% else %}
-                                            No bins
-                                        {% endif %}
-                                    </span>
+                                    <button class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" 
+                                            data-bs-target="#binDetails{{ loop.index0 }}" 
+                                            aria-expanded="false">
+                                        <i data-feather="map-pin"></i> 1 Bins
+                                    </button>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -205,7 +203,6 @@
                                 </td>
                             </tr>
                             <!-- Bin Allocations Details -->
-                            {% if line.DocumentLinesBinAllocations %}
                             <tr class="collapse" id="binDetails{{ loop.index0 }}">
                                 <td colspan="8">
                                     <div class="card card-body">
@@ -222,28 +219,38 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {% for bin_alloc in line.DocumentLinesBinAllocations %}
-                                                    <tr>
-                                                        <td><span class="badge bg-info">{{ bin_alloc.Warehouse or 'Unknown' }}</span></td>
-                                                        <td><span class="badge bg-primary">{{ bin_alloc.BinCode or ('Bin-' + bin_alloc.BinAbsEntry|string) }}</span></td>
-                                                        <td>{{ "{:,.0f}".format(bin_alloc.Quantity) }}</td>
-                                                        <td>
-                                                            {% if bin_alloc.AllowNegativeQuantity == 'tNO' %}
-                                                                <span class="text-danger"><i data-feather="x"></i> No</span>
-                                                            {% else %}
-                                                                <span class="text-success"><i data-feather="check"></i> Yes</span>
-                                                            {% endif %}
-                                                        </td>
-                                                        <td>{{ bin_alloc.BaseLineNumber }}</td>
-                                                    </tr>
-                                                    {% endfor %}
+                                                    {% if line.DocumentLinesBinAllocations %}
+                                                        {% for bin_alloc in line.DocumentLinesBinAllocations %}
+                                                        <tr>
+                                                            <td><span class="badge bg-info">{{ bin_alloc.Warehouse or 'Unknown' }}</span></td>
+                                                            <td><span class="badge bg-primary">{{ bin_alloc.BinCode or ('Bin-' + bin_alloc.BinAbsEntry|string) }}</span></td>
+                                                            <td>{{ "{:,.0f}".format(bin_alloc.Quantity) }}</td>
+                                                            <td>
+                                                                {% if bin_alloc.AllowNegativeQuantity == 'tNO' %}
+                                                                    <span class="text-danger"><i data-feather="x"></i> No</span>
+                                                                {% else %}
+                                                                    <span class="text-success"><i data-feather="check"></i> Yes</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td>{{ bin_alloc.BaseLineNumber }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <!-- Show default warehouse/bin when no allocations exist -->
+                                                        <tr>
+                                                            <td><span class="badge bg-info">{{ line.WarehouseCode or 'Unknown' }}</span></td>
+                                                            <td><span class="badge bg-primary">Bin-1</span></td>
+                                                            <td>{{ "{:,.0f}".format(line.ReleasedQuantity) }}</td>
+                                                            <td><span class="text-danger"><i data-feather="x"></i> No</span></td>
+                                                            <td>{{ line.LineNumber }}</td>
+                                                        </tr>
+                                                    {% endif %}
                                                 </tbody>
                                             </table>
                                         </div>
                                     </div>
                                 </td>
                             </tr>
-                            {% endif %}
                             {% endfor %}
                         </tbody>
                     </table>
