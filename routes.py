@@ -390,6 +390,53 @@ def dashboard():
             'pick_list_count': pick_list_count,
             'count_tasks': count_tasks
         }
+        
+        # Get recent activity - live data from database
+        recent_activities = []
+        
+        # Get recent GRPO documents
+        recent_grpos = GRPODocument.query.filter_by(user_id=current_user.id).order_by(GRPODocument.created_at.desc()).limit(5).all()
+        for grpo in recent_grpos:
+            recent_activities.append({
+                'type': 'GRPO Created',
+                'description': f"PO: {grpo.po_number}",
+                'created_at': grpo.created_at,
+                'status': grpo.status
+            })
+        
+        # Get recent inventory transfers
+        recent_transfers = InventoryTransfer.query.filter_by(user_id=current_user.id).order_by(InventoryTransfer.created_at.desc()).limit(5).all()
+        for transfer in recent_transfers:
+            recent_activities.append({
+                'type': 'Inventory Transfer',
+                'description': f"Request: {transfer.transfer_request_number}",
+                'created_at': transfer.created_at,
+                'status': transfer.status
+            })
+        
+        # Get recent pick lists
+        recent_picklists = PickList.query.filter_by(user_id=current_user.id).order_by(PickList.created_at.desc()).limit(5).all()
+        for picklist in recent_picklists:
+            recent_activities.append({
+                'type': 'Pick List',
+                'description': f"List: {picklist.pick_list_number}",
+                'created_at': picklist.created_at,
+                'status': picklist.status
+            })
+        
+        # Get recent inventory counts
+        recent_counts = InventoryCount.query.filter_by(user_id=current_user.id).order_by(InventoryCount.created_at.desc()).limit(5).all()
+        for count in recent_counts:
+            recent_activities.append({
+                'type': 'Inventory Count',
+                'description': f"Count: {count.count_name}",
+                'created_at': count.created_at,
+                'status': getattr(count, 'status', 'active')
+            })
+        
+        # Sort all activities by creation date and get top 10
+        recent_activities = sorted(recent_activities, key=lambda x: x['created_at'], reverse=True)[:10]
+        
     except Exception as e:
         logging.error(f"Database error in dashboard: {e}")
         # Handle database schema mismatch gracefully
@@ -399,9 +446,10 @@ def dashboard():
             'pick_list_count': 0,
             'count_tasks': 0
         }
+        recent_activities = []
         flash('Database needs to be updated. Please run: python migrate_database.py', 'warning')
     
-    return render_template('dashboard.html', stats=stats)
+    return render_template('dashboard.html', stats=stats, recent_activities=recent_activities)
 
 @app.route('/grpo')
 @login_required
@@ -2459,18 +2507,24 @@ def generate_barcode_api():
 @app.route('/user_management')
 @login_required
 def user_management():
-    if not current_user.has_permission('user_management'):
+    # Allow admin role or users with specific permission
+    if not (current_user.role == 'admin' or current_user.has_permission('user_management')):
         flash('Access denied. You do not have permission to manage users.', 'error')
         return redirect(url_for('dashboard'))
     
     users = User.query.all()
-    branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+    try:
+        branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+    except Exception as e:
+        logging.warning(f"Could not load branches: {e}")
+        branches = []
+    
     return render_template('user_management.html', users=users, branches=branches)
 
 @app.route('/user_management/create', methods=['POST'])
 @login_required
 def create_user():
-    if not current_user.has_permission('user_management'):
+    if not (current_user.role == 'admin' or current_user.has_permission('user_management')):
         flash('You do not have permission to create users.', 'error')
         return redirect(url_for('dashboard'))
     
@@ -2521,7 +2575,7 @@ def create_user():
 @app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def edit_user(user_id):
-    if not current_user.has_permission('user_management'):
+    if not (current_user.role == 'admin' or current_user.has_permission('user_management')):
         flash('Access denied. You do not have permission to edit users.', 'error')
         return redirect(url_for('dashboard'))
     
@@ -2555,7 +2609,7 @@ def edit_user(user_id):
 @app.route('/reset_password/<int:user_id>', methods=['POST'])
 @login_required
 def reset_password(user_id):
-    if not current_user.has_permission('user_management'):
+    if not (current_user.role == 'admin' or current_user.has_permission('user_management')):
         flash('Access denied. You do not have permission to reset passwords.', 'error')
         return redirect(url_for('dashboard'))
     

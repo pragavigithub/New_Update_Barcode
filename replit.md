@@ -51,6 +51,10 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - Updated template to hide "Add Remaining" button when LineStatus is "bost_Close" and show proper status indicators
 - Added Status column to InventoryTransferRequest line items table displaying Open/Closed status with appropriate badges
 - Enhanced transfer creation logic to properly track and log open vs closed line items
+- **Fixed Dashboard Recent Activity**: Replaced hardcoded sample data with live database queries showing real GRPO, transfers, pick lists, and inventory counts
+- **Fixed User Management Role-based Access**: Updated permission checking to properly allow admin role users to access user management functions
+- **Enhanced Admin User**: Updated admin user permissions to include all necessary access rights
+- **Updated MySQL migration**: Ensured all database changes are reflected in the comprehensive migration file
 
 ## User Preferences
 - None specified yet

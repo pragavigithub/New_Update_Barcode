@@ -79,7 +79,7 @@
                     </div>
                 </div>
                 
-                {% if current_user.role in ['admin', 'manager'] %}
+                {% if current_user.has_permission('user_management') or current_user.role in ['admin', 'manager'] %}
                 <hr>
                 <div class="row">
                     <div class="col-md-4 mb-3">
@@ -115,27 +115,38 @@
             </div>
             <div class="card-body">
                 <div class="list-group list-group-flush">
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>GRN Created</strong>
-                            <small class="text-muted d-block">PO-2024-001</small>
+                    {% if recent_activities %}
+                        {% for activity in recent_activities %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ activity.type }}</strong>
+                                <small class="text-muted d-block">{{ activity.description }}</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if activity.status == 'draft' %}
+                                    <span class="badge bg-secondary">Draft</span>
+                                {% elif activity.status == 'submitted' %}
+                                    <span class="badge bg-warning text-dark">Submitted</span>
+                                {% elif activity.status == 'qc_approved' or activity.status == 'posted' %}
+                                    <span class="badge bg-success">Completed</span>
+                                {% elif activity.status == 'rejected' %}
+                                    <span class="badge bg-danger">Rejected</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ activity.status|title }}</span>
+                                {% endif %}
+                                <small class="text-muted">{{ activity.created_at.strftime('%m/%d %H:%M') }}</small>
+                            </div>
                         </div>
-                        <span class="badge bg-primary">2 hours ago</span>
-                    </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>Inventory Transfer</strong>
-                            <small class="text-muted d-block">IT-2024-001</small>
+                        {% endfor %}
+                    {% else %}
+                        <div class="list-group-item">
+                            <div class="text-center text-muted py-3">
+                                <i data-feather="activity" class="mb-2"></i>
+                                <p class="mb-0">No recent activity found</p>
+                                <small>Start creating GRPO, transfers, or pick lists to see activity here</small>
+                            </div>
                         </div>
-                        <span class="badge bg-success">4 hours ago</span>
-                    </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>Pick List Completed</strong>
-                            <small class="text-muted d-block">PL-2024-001</small>
-                        </div>
-                        <span class="badge bg-info">6 hours ago</span>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
