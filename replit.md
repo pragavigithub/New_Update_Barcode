@@ -48,6 +48,9 @@ A Flask-based warehouse management system with SAP integration for barcode scann
 - **Fixed User Management Actions**: All action buttons (Edit, Delete, Reset Password, Activate/Deactivate) now fully functional
 - **Added change_password.html template**: Password change functionality with validation
 - **Updated MySQL Migration**: Synchronized database schema with model changes throughout all migration files
+- **Fixed Branch Management**: Added complete edit/delete functionality with proper admin-only access control
+- **Enhanced User Permission System**: Implemented permission-based navigation filtering throughout templates
+- **Fixed QC Dashboard**: Added missing qc_approved_at field to GRPODocument model to resolve dashboard errors
 - **Enhanced Picklist module**: Fixed ItemCode display issue in Pick List Items table
 - Updated template to show ItemCode instead of OrderEntry number for better user experience
 - Added ItemDescription and Customer details in enhanced picklist lines

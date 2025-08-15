@@ -129,6 +129,7 @@ class GRPODocument(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     qc_user_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                         nullable=True)  # QC approver
+    qc_approved_at = db.Column(db.DateTime, nullable=True)  # QC approval timestamp
     qc_notes = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)  # General notes/comments for the GRPO
     draft_or_post = db.Column(db.String(10), default='draft')  # draft, post

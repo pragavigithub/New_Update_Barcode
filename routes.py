@@ -1473,14 +1473,18 @@ def qc_dashboard():
     from sqlalchemy import text
     
     # Get average processing time for GRPOs (from created to QC approved)
-    grpo_avg = db.session.execute(text("""
-        SELECT AVG(
-            (julianday(qc_approved_at) - julianday(created_at)) * 24
-        ) as avg_hours
-        FROM grpo_documents 
-        WHERE qc_approved_at IS NOT NULL 
-        AND created_at >= date('now', '-7 days')
-    """)).scalar()
+    try:
+        grpo_avg = db.session.execute(text("""
+            SELECT AVG(
+                (julianday(qc_approved_at) - julianday(created_at)) * 24
+            ) as avg_hours
+            FROM grpo_documents 
+            WHERE qc_approved_at IS NOT NULL 
+            AND created_at >= date('now', '-7 days')
+        """)).scalar()
+    except Exception as e:
+        logger.warning(f"Error calculating GRPO average processing time: {e}")
+        grpo_avg = 0
     
     # Get average processing time for transfers
     transfer_avg = db.session.execute(text("""
