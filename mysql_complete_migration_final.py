@@ -456,6 +456,7 @@ BACKUP_PATH=backups/
                     supplier_code VARCHAR(50),
                     supplier_name VARCHAR(200),
                     po_date DATETIME,
+                    qc_approved_at DATETIME,
                     po_total DECIMAL(15,2),
                     status VARCHAR(20) DEFAULT 'draft',
                     user_id INT NOT NULL,
