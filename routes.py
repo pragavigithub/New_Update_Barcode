@@ -1439,9 +1439,83 @@ def qc_dashboard():
     # Get pending GRPOs for QC approval
     pending_grpos = GRPODocument.query.filter_by(status='submitted').order_by(GRPODocument.created_at.desc()).all()
     
+    # Calculate metrics for today
+    from datetime import datetime, date
+    today = date.today()
+    
+    # Count approved today (both GRPO and transfers)
+    approved_grpos_today = GRPODocument.query.filter(
+        GRPODocument.status.in_(['qc_approved', 'posted']),
+        db.func.date(GRPODocument.qc_approved_at) == today
+    ).count()
+    
+    approved_transfers_today = InventoryTransfer.query.filter(
+        InventoryTransfer.status == 'qc_approved',
+        db.func.date(InventoryTransfer.qc_approved_at) == today
+    ).count()
+    
+    approved_today = approved_grpos_today + approved_transfers_today
+    
+    # Count rejected today
+    rejected_grpos_today = GRPODocument.query.filter(
+        GRPODocument.status == 'rejected',
+        db.func.date(GRPODocument.qc_approved_at) == today
+    ).count()
+    
+    rejected_transfers_today = InventoryTransfer.query.filter(
+        InventoryTransfer.status == 'rejected',
+        db.func.date(InventoryTransfer.qc_approved_at) == today
+    ).count()
+    
+    rejected_today = rejected_grpos_today + rejected_transfers_today
+    
+    # Calculate average processing time
+    from sqlalchemy import text
+    
+    # Get average processing time for GRPOs (from created to QC approved)
+    grpo_avg = db.session.execute(text("""
+        SELECT AVG(
+            (julianday(qc_approved_at) - julianday(created_at)) * 24
+        ) as avg_hours
+        FROM grpo_documents 
+        WHERE qc_approved_at IS NOT NULL 
+        AND created_at >= date('now', '-7 days')
+    """)).scalar()
+    
+    # Get average processing time for transfers
+    transfer_avg = db.session.execute(text("""
+        SELECT AVG(
+            (julianday(qc_approved_at) - julianday(created_at)) * 24
+        ) as avg_hours
+        FROM inventory_transfers 
+        WHERE qc_approved_at IS NOT NULL 
+        AND created_at >= date('now', '-7 days')
+    """)).scalar()
+    
+    # Calculate overall average
+    avg_processing_hours = 0
+    if grpo_avg and transfer_avg:
+        avg_processing_hours = (grpo_avg + transfer_avg) / 2
+    elif grpo_avg:
+        avg_processing_hours = grpo_avg
+    elif transfer_avg:
+        avg_processing_hours = transfer_avg
+    
+    # Format processing time
+    if avg_processing_hours:
+        if avg_processing_hours < 1:
+            avg_processing_time = f"{int(avg_processing_hours * 60)}m"
+        else:
+            avg_processing_time = f"{avg_processing_hours:.1f}h"
+    else:
+        avg_processing_time = "N/A"
+    
     return render_template('qc_dashboard.html', 
                          pending_transfers=pending_transfers,
-                         pending_grpos=pending_grpos)
+                         pending_grpos=pending_grpos,
+                         approved_today=approved_today,
+                         rejected_today=rejected_today,
+                         avg_processing_time=avg_processing_time)
 
 @app.route('/pick_list')
 @login_required

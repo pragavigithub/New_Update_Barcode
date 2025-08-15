@@ -30,7 +30,7 @@
             <div class="card bg-success text-white">
                 <div class="card-body text-center">
                     <i data-feather="check-circle" class="mb-3" style="width: 48px; height: 48px;"></i>
-                    <h3 id="approvedToday">0</h3>
+                    <h3 id="approvedToday">{{ approved_today }}</h3>
                     <p>Approved Today</p>
                 </div>
             </div>
@@ -39,7 +39,7 @@
             <div class="card bg-danger text-white">
                 <div class="card-body text-center">
                     <i data-feather="x-circle" class="mb-3" style="width: 48px; height: 48px;"></i>
-                    <h3 id="rejectedToday">0</h3>
+                    <h3 id="rejectedToday">{{ rejected_today }}</h3>
                     <p>Rejected Today</p>
                 </div>
             </div>
@@ -48,7 +48,7 @@
             <div class="card bg-info text-white">
                 <div class="card-body text-center">
                     <i data-feather="trending-up" class="mb-3" style="width: 48px; height: 48px;"></i>
-                    <h3 id="avgProcessingTime">2.5h</h3>
+                    <h3 id="avgProcessingTime">{{ avg_processing_time }}</h3>
                     <p>Avg Processing Time</p>
                 </div>
             </div>
