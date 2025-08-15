@@ -1474,27 +1474,76 @@ def qc_dashboard():
     
     # Get average processing time for GRPOs (from created to QC approved)
     try:
-        grpo_avg = db.session.execute(text("""
-            SELECT AVG(
-                (julianday(qc_approved_at) - julianday(created_at)) * 24
-            ) as avg_hours
-            FROM grpo_documents 
-            WHERE qc_approved_at IS NOT NULL 
-            AND created_at >= date('now', '-7 days')
-        """)).scalar()
+        # Use database-agnostic SQL for date calculations
+        if 'postgresql' in str(db.engine.url).lower():
+            # PostgreSQL syntax
+            grpo_avg = db.session.execute(text("""
+                SELECT AVG(
+                    EXTRACT(EPOCH FROM (qc_approved_at - created_at)) / 3600
+                ) as avg_hours
+                FROM grpo_documents 
+                WHERE qc_approved_at IS NOT NULL 
+                AND created_at >= CURRENT_DATE - INTERVAL '7 days'
+            """)).scalar()
+        elif 'mysql' in str(db.engine.url).lower():
+            # MySQL syntax
+            grpo_avg = db.session.execute(text("""
+                SELECT AVG(
+                    TIMESTAMPDIFF(HOUR, created_at, qc_approved_at)
+                ) as avg_hours
+                FROM grpo_documents 
+                WHERE qc_approved_at IS NOT NULL 
+                AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            """)).scalar()
+        else:
+            # SQLite syntax (fallback)
+            grpo_avg = db.session.execute(text("""
+                SELECT AVG(
+                    (julianday(qc_approved_at) - julianday(created_at)) * 24
+                ) as avg_hours
+                FROM grpo_documents 
+                WHERE qc_approved_at IS NOT NULL 
+                AND created_at >= date('now', '-7 days')
+            """)).scalar()
     except Exception as e:
         logging.warning(f"Error calculating GRPO average processing time: {e}")
         grpo_avg = 0
     
     # Get average processing time for transfers
-    transfer_avg = db.session.execute(text("""
-        SELECT AVG(
-            (julianday(qc_approved_at) - julianday(created_at)) * 24
-        ) as avg_hours
-        FROM inventory_transfers 
-        WHERE qc_approved_at IS NOT NULL 
-        AND created_at >= date('now', '-7 days')
-    """)).scalar()
+    try:
+        if 'postgresql' in str(db.engine.url).lower():
+            # PostgreSQL syntax
+            transfer_avg = db.session.execute(text("""
+                SELECT AVG(
+                    EXTRACT(EPOCH FROM (qc_approved_at - created_at)) / 3600
+                ) as avg_hours
+                FROM inventory_transfers 
+                WHERE qc_approved_at IS NOT NULL 
+                AND created_at >= CURRENT_DATE - INTERVAL '7 days'
+            """)).scalar()
+        elif 'mysql' in str(db.engine.url).lower():
+            # MySQL syntax
+            transfer_avg = db.session.execute(text("""
+                SELECT AVG(
+                    TIMESTAMPDIFF(HOUR, created_at, qc_approved_at)
+                ) as avg_hours
+                FROM inventory_transfers 
+                WHERE qc_approved_at IS NOT NULL 
+                AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            """)).scalar()
+        else:
+            # SQLite syntax (fallback)
+            transfer_avg = db.session.execute(text("""
+                SELECT AVG(
+                    (julianday(qc_approved_at) - julianday(created_at)) * 24
+                ) as avg_hours
+                FROM inventory_transfers 
+                WHERE qc_approved_at IS NOT NULL 
+                AND created_at >= date('now', '-7 days')
+            """)).scalar()
+    except Exception as e:
+        logging.warning(f"Error calculating transfer average processing time: {e}")
+        transfer_avg = 0
     
     # Calculate overall average
     avg_processing_hours = 0
