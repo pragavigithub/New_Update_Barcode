@@ -884,9 +884,9 @@ BACKUP_PATH=backups/
                 CREATE TABLE bin_scanning_logs (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     bin_code VARCHAR(100) NOT NULL,
-                    user_id INT NOT NULL,
+                    user_id INT NULL,
                     scan_type VARCHAR(50) NOT NULL,
-                    scan_data TEXT,
+                    scan_data VARCHAR(150),
                     items_found INT DEFAULT 0,
                     scan_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
