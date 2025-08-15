@@ -581,7 +581,7 @@ function renderTable() {
                                         <i data-feather="printer"></i> Print
                                     </button>
                                     ${item.BatchDetails && item.BatchDetails.length > 0 ? `
-                                        <button class="btn btn-outline-warning btn-sm" onclick="showBatchDetails('${item.ItemCode}', ${JSON.stringify(item.BatchDetails).replace(/'/g, '&apos;')})">
+                                        <button class="btn btn-outline-warning btn-sm" onclick="showBatchDetails('${item.ItemCode}', '${encodeURIComponent(JSON.stringify(item.BatchDetails))}')">
                                             <i data-feather="layers"></i> Batches
                                         </button>
                                     ` : ''}
@@ -777,45 +777,66 @@ function showEnhancedItemDetails(itemCode, itemData) {
     feather.replace();
 }
 
-function showBatchDetails(itemCode, batchDetails) {
-    const content = `
-        <div class="row">
-            <div class="col-12">
-                <h6>Batch Details for ${itemCode}</h6>
-                <div class="table-responsive">
-                    <table class="table table-striped table-sm">
-                        <thead>
-                            <tr>
-                                <th>Batch Number</th>
-                                <th>Status</th>
-                                <th>Admission Date</th>
-                                <th>Expiry Date</th>
-                                <th>Doc Entry</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${batchDetails.map(batch => `
+function showBatchDetails(itemCode, batchDetailsString) {
+    try {
+        // Parse the batch details from encoded string
+        let batchDetails;
+        if (typeof batchDetailsString === 'string') {
+            batchDetails = JSON.parse(decodeURIComponent(batchDetailsString));
+        } else {
+            batchDetails = batchDetailsString;
+        }
+        
+        if (!batchDetails || !Array.isArray(batchDetails) || batchDetails.length === 0) {
+            alert('No batch details available for this item');
+            return;
+        }
+        
+        const content = `
+            <div class="row">
+                <div class="col-12">
+                    <h6>Batch Details for ${itemCode}</h6>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm">
+                            <thead>
                                 <tr>
-                                    <td><strong>${batch.Batch || 'N/A'}</strong></td>
-                                    <td>${batch.Status ? batch.Status.replace('bdsStatus_', '') : 'N/A'}</td>
-                                    <td>${formatDate(batch.AdmissionDate)}</td>
-                                    <td>${formatExpiryDate(batch.ExpirationDate)}</td>
-                                    <td>${batch.DocEntry || 'N/A'}</td>
+                                    <th>Batch Number</th>
+                                    <th>Status</th>
+                                    <th>Admission Date</th>
+                                    <th>Expiry Date</th>
+                                    <th>Doc Entry</th>
+                                    <th>Quantity</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                ${batchDetails.map(batch => `
+                                    <tr>
+                                        <td><strong>${batch.Batch || batch.BatchNumber || 'N/A'}</strong></td>
+                                        <td>${batch.Status ? batch.Status.replace('bdsStatus_', '') : 'N/A'}</td>
+                                        <td>${formatDate(batch.AdmissionDate)}</td>
+                                        <td>${formatExpiryDate(batch.ExpirationDate || batch.ExpiryDate)}</td>
+                                        <td>${batch.DocEntry || 'N/A'}</td>
+                                        <td><span class="badge bg-primary">${batch.Quantity || batch.OnHand || 0}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
-    
-    document.getElementById('itemDetailsContent').innerHTML = content;
-    currentItemCode = itemCode;
-    
-    const modal = new bootstrap.Modal(document.getElementById('itemDetailsModal'));
-    modal.show();
-    feather.replace();
+        `;
+        
+        document.getElementById('itemDetailsContent').innerHTML = content;
+        currentItemCode = itemCode;
+        
+        const modal = new bootstrap.Modal(document.getElementById('itemDetailsModal'));
+        modal.show();
+        feather.replace();
+        
+    } catch (error) {
+        console.error('Error showing batch details:', error);
+        alert('Error displaying batch details: ' + error.message);
+    }
 }
 
 async function showItemDetails(itemCode) {
@@ -946,10 +967,35 @@ async function printBinLabel(binCode) {
     }
 }
 
-function printItemLabel(itemCode = null) {
+async function printItemLabel(itemCode = null) {
     const code = itemCode || currentItemCode;
-    if (code) {
-        window.wmsApp.printLabel(code);
+    if (!code) {
+        alert('No item selected for printing');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/print_label', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                item_code: code,
+                label_type: 'item'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Label generated successfully for ${code}`);
+        } else {
+            alert(`Error printing label: ${result.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error printing item label:', error);
+        alert('Error printing item label');
     }
 }
 
