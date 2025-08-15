@@ -245,7 +245,7 @@
                 <h5 class="modal-title">Add Item to Transfer</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="addItemForm" method="POST" action="{{ url_for('inventory_transfer_detail', transfer_id=transfer.id) }}" onsubmit="return handleFormSubmit(event);">
+            <form id="addItemForm" method="POST" action="{{ url_for('inventory_transfer.add_transfer_item', transfer_id=transfer.id) }}" onsubmit="return handleFormSubmit(event);">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="item_code" class="form-label">Item Code <span class="text-danger">*</span></label>

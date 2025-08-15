@@ -121,7 +121,11 @@ def approve(grpo_id):
             return jsonify({'success': False, 'error': 'Only submitted GRPOs can be approved'}), 400
         
         # Get QC notes
-        qc_notes = request.form.get('qc_notes', '') if request.form else request.json.get('qc_notes', '')
+        qc_notes = ''
+        if request.form:
+            qc_notes = request.form.get('qc_notes', '')
+        elif request.json:
+            qc_notes = request.json.get('qc_notes', '')
         
         # Mark items as approved
         for item in grpo.items:
@@ -189,7 +193,11 @@ def reject(grpo_id):
             return jsonify({'success': False, 'error': 'Only submitted GRPOs can be rejected'}), 400
         
         # Get rejection reason
-        qc_notes = request.form.get('qc_notes', '') if request.form else request.json.get('qc_notes', '')
+        qc_notes = ''
+        if request.form:
+            qc_notes = request.form.get('qc_notes', '')
+        elif request.json:
+            qc_notes = request.json.get('qc_notes', '')
         
         if not qc_notes:
             return jsonify({'success': False, 'error': 'Rejection reason is required'}), 400
@@ -215,4 +223,110 @@ def reject(grpo_id):
         
     except Exception as e:
         logging.error(f"Error rejecting GRPO: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@grpo_bp.route('/<int:grpo_id>/add_item', methods=['POST'])
+@login_required
+def add_grpo_item(grpo_id):
+    """Add item to GRPO with duplicate prevention"""
+    try:
+        grpo = GRPODocument.query.get_or_404(grpo_id)
+        
+        # Check permissions
+        if grpo.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            flash('Access denied - You can only modify your own GRPOs', 'error')
+            return redirect(url_for('grpo.detail', grpo_id=grpo_id))
+        
+        if grpo.status != 'draft':
+            flash('Cannot add items to non-draft GRPO', 'error')
+            return redirect(url_for('grpo.detail', grpo_id=grpo_id))
+        
+        # Get form data
+        item_code = request.form.get('item_code')
+        item_name = request.form.get('item_name')
+        quantity = float(request.form.get('quantity', 0))
+        unit_of_measure = request.form.get('unit_of_measure')
+        warehouse_code = request.form.get('warehouse_code')
+        bin_location = request.form.get('bin_location')
+        batch_number = request.form.get('batch_number')
+        expiry_date = request.form.get('expiry_date')
+        
+        if not all([item_code, item_name, quantity > 0]):
+            flash('Item Code, Item Name, and Quantity are required', 'error')
+            return redirect(url_for('grpo.detail', grpo_id=grpo_id))
+        
+        # **DUPLICATE PREVENTION LOGIC**
+        # Check if this item_code already exists in this GRPO
+        existing_item = GRPOItem.query.filter_by(
+            grpo_id=grpo_id,
+            item_code=item_code
+        ).first()
+        
+        if existing_item:
+            flash(f'Item {item_code} has already been added to this GRPO. Each item can only be received once per GRPO to avoid duplication.', 'error')
+            return redirect(url_for('grpo.detail', grpo_id=grpo_id))
+        
+        # Parse expiry date if provided
+        expiry_date_obj = None
+        if expiry_date:
+            try:
+                from datetime import datetime
+                expiry_date_obj = datetime.strptime(expiry_date, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Invalid expiry date format. Use YYYY-MM-DD', 'error')
+                return redirect(url_for('grpo.detail', grpo_id=grpo_id))
+        
+        # Create new GRPO item
+        grpo_item = GRPOItem(
+            grpo_id=grpo_id,
+            item_code=item_code,
+            item_name=item_name,
+            quantity=quantity,
+            received_quantity=quantity,
+            unit_of_measure=unit_of_measure,
+            warehouse_code=warehouse_code,
+            bin_location=bin_location,
+            batch_number=batch_number,
+            expiry_date=expiry_date_obj,
+            qc_status='pending'
+        )
+        
+        db.session.add(grpo_item)
+        db.session.commit()
+        
+        logging.info(f"✅ Item {item_code} added to GRPO {grpo_id} with duplicate prevention")
+        flash(f'Item {item_code} successfully added to GRPO', 'success')
+        
+    except Exception as e:
+        logging.error(f"Error adding item to GRPO: {str(e)}")
+        flash(f'Error adding item: {str(e)}', 'error')
+    
+    return redirect(url_for('grpo.detail', grpo_id=grpo_id))
+
+@grpo_bp.route('/items/<int:item_id>/delete', methods=['POST'])
+@login_required
+def delete_grpo_item(item_id):
+    """Delete GRPO item"""
+    try:
+        item = GRPOItem.query.get_or_404(item_id)
+        grpo = item.grpo_document
+        
+        # Check permissions
+        if grpo.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if grpo.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot delete items from non-draft GRPO'}), 400
+        
+        grpo_id = grpo.id
+        item_code = item.item_code
+        
+        db.session.delete(item)
+        db.session.commit()
+        
+        logging.info(f"🗑️ Item {item_code} deleted from GRPO {grpo_id}")
+        return jsonify({'success': True, 'message': f'Item {item_code} deleted'})
+        
+    except Exception as e:
+        logging.error(f"Error deleting GRPO item: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
