@@ -54,38 +54,49 @@
                             <i data-feather="home"></i> Dashboard
                         </a>
                     </li>
+                    {% if current_user.has_permission('grpo') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('grpo') }}">
                             <i data-feather="package"></i> GRN
                         </a>
                     </li>
+                    {% endif %}
+                    {% if current_user.has_permission('inventory_transfer') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('inventory_transfer') }}">
                             <i data-feather="move"></i> Transfer
                         </a>
                     </li>
+                    {% endif %}
+                    {% if current_user.has_permission('pick_list') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('pick_list') }}">
                             <i data-feather="list"></i> Pick List
                         </a>
                     </li>
+                    {% endif %}
+                    {% if current_user.has_permission('inventory_counting') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('inventory_counting') }}">
                             <i data-feather="check-square"></i> Counting
                         </a>
                     </li>
+                    {% endif %}
+                    {% if current_user.has_permission('bin_scanning') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('bin_scanning') }}">
                             <i data-feather="search"></i> Bin Scan
                         </a>
                     </li>
-                    {% if current_user.role in ['qc', 'manager', 'admin'] %}
+                    {% endif %}
+                    {% if current_user.has_permission('qc_dashboard') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('qc_dashboard') }}">
                             <i data-feather="clipboard"></i> QC Dashboard
                         </a>
                     </li>
                     {% endif %}
+                    {% if current_user.has_permission('label_printing') %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i data-feather="printer"></i> Labels
@@ -95,13 +106,21 @@
                             <li><a class="dropdown-item" href="{{ url_for('barcode_reprint') }}">Reprint Labels</a></li>
                         </ul>
                     </li>
+                    {% endif %}
                 </ul>
                 
                 <ul class="navbar-nav">
-                    {% if current_user.role == 'admin' %}
+                    {% if current_user.has_permission('user_management') or current_user.role == 'admin' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('user_management') }}">
                             <i data-feather="users"></i> Users
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% if current_user.role == 'admin' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('branch_management') }}">
+                            <i data-feather="git-branch"></i> Branches
                         </a>
                     </li>
                     {% endif %}

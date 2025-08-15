@@ -3032,6 +3032,82 @@ def create_branch():
     flash(f'Branch {name} created successfully!', 'success')
     return redirect(url_for('branch_management'))
 
+@app.route('/admin/branch/<branch_id>/edit', methods=['POST'])
+@login_required
+def edit_branch(branch_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    name = request.form['name']
+    address = request.form.get('address', '')
+    phone = request.form.get('phone', '')
+    email = request.form.get('email', '')
+    manager_name = request.form.get('manager_name', '')
+    is_active = 'is_active' in request.form
+    is_default = 'is_default' in request.form
+    
+    # Check if branch exists
+    existing = db.session.execute(db.text("SELECT id FROM branches WHERE id = :id"), {"id": branch_id}).fetchone()
+    if not existing:
+        flash('Branch not found.', 'error')
+        return redirect(url_for('branch_management'))
+    
+    # If this is the new default, remove default from others
+    if is_default:
+        db.session.execute(db.text("UPDATE branches SET is_default = FALSE"))
+    
+    # Update branch
+    db.session.execute(db.text("""
+        UPDATE branches SET 
+        name = :name, 
+        address = :address, 
+        phone = :phone, 
+        email = :email, 
+        manager_name = :manager_name, 
+        is_active = :is_active, 
+        is_default = :is_default
+        WHERE id = :id
+    """), {
+        "id": branch_id,
+        "name": name,
+        "address": address,
+        "phone": phone,
+        "email": email,
+        "manager_name": manager_name,
+        "is_active": is_active,
+        "is_default": is_default
+    })
+    
+    db.session.commit()
+    flash(f'Branch {name} updated successfully!', 'success')
+    return redirect(url_for('branch_management'))
+
+@app.route('/admin/branch/<branch_id>/delete', methods=['POST'])
+@login_required
+def delete_branch(branch_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'Access denied.'})
+    
+    # Check if branch exists and is not default
+    existing = db.session.execute(db.text("SELECT id, is_default, name FROM branches WHERE id = :id"), {"id": branch_id}).fetchone()
+    if not existing:
+        return jsonify({'success': False, 'message': 'Branch not found.'})
+    
+    if existing.is_default:
+        return jsonify({'success': False, 'message': 'Cannot delete default branch.'})
+    
+    # Check if branch has users assigned
+    users_count = db.session.execute(db.text("SELECT COUNT(*) as count FROM users WHERE branch_id = :branch_id"), {"branch_id": branch_id}).fetchone()
+    if users_count.count > 0:
+        return jsonify({'success': False, 'message': 'Cannot delete branch with assigned users.'})
+    
+    # Delete branch
+    db.session.execute(db.text("DELETE FROM branches WHERE id = :id"), {"id": branch_id})
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': f'Branch {existing.name} deleted successfully.'})
+
 # API endpoints for barcode scanning
 @app.route('/api/validate_po', methods=['POST'])
 @login_required

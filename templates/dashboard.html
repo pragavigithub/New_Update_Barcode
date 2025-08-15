@@ -12,6 +12,7 @@
 
 <!-- Statistics Cards -->
 <div class="row mb-4">
+    {% if current_user.has_permission('grpo') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('grpo') }}">
             <div class="card-body text-center">
@@ -21,7 +22,9 @@
             </div>
         </div>
     </div>
+    {% endif %}
     
+    {% if current_user.has_permission('inventory_transfer') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('inventory_transfer') }}">
             <div class="card-body text-center">
@@ -31,7 +34,9 @@
             </div>
         </div>
     </div>
+    {% endif %}
     
+    {% if current_user.has_permission('pick_list') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('pick_list') }}">
             <div class="card-body text-center">
@@ -41,7 +46,9 @@
             </div>
         </div>
     </div>
+    {% endif %}
     
+    {% if current_user.has_permission('inventory_counting') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('inventory_counting') }}">
             <div class="card-body text-center">
@@ -51,6 +58,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <!-- Quick Actions -->
@@ -62,21 +70,27 @@
             </div>
             <div class="card-body">
                 <div class="row">
+                    {% if current_user.has_permission('bin_scanning') %}
                     <div class="col-md-4 mb-3">
                         <a href="{{ url_for('bin_scanning') }}" class="btn btn-outline-primary w-100">
                             <i data-feather="search"></i> Scan Bin
                         </a>
                     </div>
+                    {% endif %}
+                    {% if current_user.has_permission('label_printing') %}
                     <div class="col-md-4 mb-3">
                         <a href="{{ url_for('label_printing') }}" class="btn btn-outline-success w-100">
                             <i data-feather="printer"></i> Print Labels
                         </a>
                     </div>
+                    {% endif %}
+                    {% if current_user.has_permission('bin_scanning') or current_user.has_permission('grpo') %}
                     <div class="col-md-4 mb-3">
                         <button class="btn btn-outline-warning w-100" onclick="startQuickScan()">
                             <i data-feather="camera"></i> Quick Scan
                         </button>
                     </div>
+                    {% endif %}
                 </div>
                 
                 {% if current_user.has_permission('user_management') or current_user.role in ['admin', 'manager'] %}
