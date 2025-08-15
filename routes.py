@@ -1483,7 +1483,7 @@ def qc_dashboard():
             AND created_at >= date('now', '-7 days')
         """)).scalar()
     except Exception as e:
-        logger.warning(f"Error calculating GRPO average processing time: {e}")
+        logging.warning(f"Error calculating GRPO average processing time: {e}")
         grpo_avg = 0
     
     # Get average processing time for transfers
