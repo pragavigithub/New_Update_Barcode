@@ -594,14 +594,79 @@ def serial_submit(transfer_id):
         logging.error(f"Error submitting serial transfer: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@transfer_bp.route('/serial/items/<int:item_id>/delete', methods=['POST'])
+@login_required
+def serial_delete_item(item_id):
+    """Delete serial number transfer item"""
+    try:
+        from models import SerialNumberTransferItem
+        
+        item = SerialNumberTransferItem.query.get_or_404(item_id)
+        transfer = item.serial_transfer
+        
+        # Check permissions
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot delete items from non-draft transfer'}), 400
+        
+        transfer_id = transfer.id
+        item_code = item.item_code
+        
+        db.session.delete(item)
+        db.session.commit()
+        
+        logging.info(f"🗑️ Item {item_code} deleted from serial number transfer {transfer_id}")
+        return jsonify({'success': True, 'message': f'Item {item_code} deleted'})
+        
+    except Exception as e:
+        logging.error(f"Error deleting serial transfer item: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@transfer_bp.route('/serial/items/<int:item_id>/serials', methods=['GET'])
+@login_required  
+def serial_get_item_serials(item_id):
+    """Get serial numbers for a transfer item"""
+    try:
+        from models import SerialNumberTransferItem
+        
+        item = SerialNumberTransferItem.query.get_or_404(item_id)
+        transfer = item.serial_transfer
+        
+        # Check permissions
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager', 'qc']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        serials = []
+        for serial in item.serial_numbers:
+            serials.append({
+                'serial_number': serial.serial_number,
+                'is_validated': serial.is_validated,
+                'system_serial_number': serial.system_serial_number,
+                'validation_error': serial.validation_error
+            })
+        
+        return jsonify({
+            'success': True,
+            'item_code': item.item_code,
+            'item_name': item.item_name,
+            'serials': serials
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting serial numbers: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def validate_serial_number_with_sap(serial_number, item_code):
     """Validate serial number against SAP B1 API"""
     try:
         import requests
         from flask import current_app
+        import os
         
-        # SAP B1 API endpoint
-        base_url = current_app.config.get('SAP_B1_SERVER', 'https://192.168.1.5:50000')
+        # SAP B1 API endpoint - use user-provided URLs
+        base_url = os.getenv('SAP_B1_SERVER', 'https://192.168.1.5:50000')
         api_url = f"{base_url}/b1s/v1/SerialNumberDetails"
         
         # Add filter for serial number
@@ -609,8 +674,22 @@ def validate_serial_number_with_sap(serial_number, item_code):
             '$filter': f"SerialNumber eq '{serial_number}'"
         }
         
-        # Make API call (you'll need to handle authentication)
-        response = requests.get(api_url, params=params, verify=False, timeout=10)
+        # Headers for SAP B1 API
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        }
+        
+        # Add authentication if available
+        sap_user = os.getenv('SAP_B1_USER')
+        sap_password = os.getenv('SAP_B1_PASSWORD')
+        if sap_user and sap_password:
+            import base64
+            credentials = base64.b64encode(f"{sap_user}:{sap_password}".encode()).decode()
+            headers['Authorization'] = f'Basic {credentials}'
+        
+        # Make API call
+        response = requests.get(api_url, params=params, headers=headers, verify=False, timeout=10)
         
         if response.status_code == 200:
             data = response.json()

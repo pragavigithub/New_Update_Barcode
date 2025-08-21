@@ -320,38 +320,65 @@ function showSerialNumbers(itemId, itemCode) {
     // Update modal title
     document.querySelector('#serialNumbersModal .modal-title').textContent = `Serial Numbers for ${itemCode}`;
     
-    // Load serial numbers for this item
-    {% for item in transfer.items %}
-    if ({{ item.id }} === itemId) {
-        let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Serial Number</th><th>Status</th><th>SAP System Number</th><th>Error</th></tr></thead><tbody>';
-        
-        {% for serial in item.serial_numbers %}
-        html += '<tr>';
-        html += '<td><strong>{{ serial.serial_number }}</strong></td>';
-        html += '<td>';
-        {% if serial.is_validated %}
-        html += '<span class="badge bg-success">Validated ✓</span>';
-        {% else %}
-        html += '<span class="badge bg-danger">Invalid ❌</span>';
-        {% endif %}
-        html += '</td>';
-        html += '<td>{{ serial.system_serial_number or "-" }}</td>';
-        html += '<td class="text-danger">{{ serial.validation_error or "-" }}</td>';
-        html += '</tr>';
-        {% endfor %}
-        
-        html += '</tbody></table></div>';
-        content.innerHTML = html;
-    }
-    {% endfor %}
+    // Load serial numbers via AJAX
+    content.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Loading...</p></div>';
+    
+    fetch(`/inventory_transfer/serial/items/${itemId}/serials`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Serial Number</th><th>Status</th><th>SAP System Number</th><th>Error</th></tr></thead><tbody>';
+            
+            data.serials.forEach(serial => {
+                html += '<tr>';
+                html += `<td><strong>${serial.serial_number}</strong></td>`;
+                html += '<td>';
+                if (serial.is_validated) {
+                    html += '<span class="badge bg-success">Validated ✓</span>';
+                } else {
+                    html += '<span class="badge bg-danger">Invalid ❌</span>';
+                }
+                html += '</td>';
+                html += `<td>${serial.system_serial_number || '-'}</td>`;
+                html += `<td class="text-danger">${serial.validation_error || '-'}</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table></div>';
+            content.innerHTML = html;
+        } else {
+            content.innerHTML = `<div class="alert alert-danger">Error loading serial numbers: ${data.error}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        content.innerHTML = '<div class="alert alert-danger">Error loading serial numbers</div>';
+    });
     
     modal.show();
 }
 
 function removeItem(itemId) {
     if (confirm('Are you sure you want to remove this item and all its serial numbers?')) {
-        // Implementation would be similar to regular inventory transfer
-        alert('Remove item functionality to be implemented');
+        fetch(`/inventory_transfer/serial/items/${itemId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ ${data.message}`);
+                location.reload();
+            } else {
+                alert(`❌ Error: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Error removing item');
+        });
     }
 }
 </script>
