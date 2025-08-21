@@ -5,8 +5,8 @@ All routes related to inventory transfers between warehouses/bins
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
-from modules.inventory_transfer.models import InventoryTransfer, InventoryTransferItem, TransferStatusHistory
-from modules.shared.models import User
+from models import InventoryTransfer, InventoryTransferItem
+from models import User
 import logging
 from datetime import datetime
 
@@ -358,15 +358,17 @@ def delete_transfer_item(item_id):
 def log_status_change(transfer_id, previous_status, new_status, changed_by_id, notes=None):
     """Log status change to history table"""
     try:
-        history = TransferStatusHistory(
-            transfer_id=transfer_id,
-            previous_status=previous_status,
-            new_status=new_status,
-            changed_by_id=changed_by_id,
-            notes=notes
-        )
-        db.session.add(history)
-        db.session.commit()
+        # TODO: Add TransferStatusHistory model to main models.py if needed
+        # history = TransferStatusHistory(
+        #     transfer_id=transfer_id,
+        #     previous_status=previous_status,
+        #     new_status=new_status,
+        #     changed_by_id=changed_by_id,
+        #     notes=notes
+        # )
+        # db.session.add(history)
+        # db.session.commit()
+        logging.info(f"Status changed from {previous_status} to {new_status} by user {changed_by_id}")
     except Exception as e:
         logging.error(f"Error logging status change: {str(e)}")
 

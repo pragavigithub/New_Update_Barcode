@@ -4,7 +4,7 @@ Contains all models related to inventory transfers between warehouses/bins
 """
 from app import db
 from datetime import datetime
-from modules.shared.models import User
+from models import User
 
 class InventoryTransfer(db.Model):
     """Main inventory transfer document header"""
