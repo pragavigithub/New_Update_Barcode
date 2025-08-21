@@ -770,6 +770,7 @@ def serial_get_item_serials(item_id):
         serials = []
         for serial in item.serial_numbers:
             serials.append({
+                'id': serial.id,
                 'serial_number': serial.serial_number,
                 'is_validated': serial.is_validated,
                 'system_serial_number': serial.system_serial_number,
@@ -778,6 +779,7 @@ def serial_get_item_serials(item_id):
         
         return jsonify({
             'success': True,
+            'transfer_status': transfer.status,
             'item_code': item.item_code,
             'item_name': item.item_name,
             'serial_numbers': serials  # Changed from 'serials' to match template expectation
@@ -785,6 +787,44 @@ def serial_get_item_serials(item_id):
         
     except Exception as e:
         logging.error(f"Error getting serial numbers: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@transfer_bp.route('/serial/serials/<int:serial_id>/delete', methods=['POST'])
+@login_required
+def serial_delete_serial_number(serial_id):
+    """Delete individual serial number from transfer"""
+    try:
+        from models import SerialNumberTransferSerial
+        
+        serial = SerialNumberTransferSerial.query.get_or_404(serial_id)
+        item = serial.item
+        transfer = item.serial_transfer
+        
+        # Check permissions
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot delete serial numbers from non-draft transfer'}), 400
+        
+        # Store details before deletion
+        serial_number = serial.serial_number
+        item_code = item.item_code
+        transfer_id = transfer.id
+        
+        # Delete the serial number
+        db.session.delete(serial)
+        db.session.commit()
+        
+        logging.info(f"🗑️ Serial number {serial_number} deleted from item {item_code} in transfer {transfer_id}")
+        return jsonify({
+            'success': True, 
+            'message': f'Serial number {serial_number} deleted',
+            'item_code': item_code
+        })
+        
+    except Exception as e:
+        logging.error(f"Error deleting serial number: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def validate_serial_number_with_sap(serial_number, item_code):

@@ -378,7 +378,7 @@ function showSerialNumbers(itemId, itemCode) {
             if (data.success) {
                 let html = '<div class="table-responsive">';
                 html += '<table class="table table-sm">';
-                html += '<thead><tr><th>Serial Number</th><th>Status</th><th>SAP Validation</th></tr></thead>';
+                html += '<thead><tr><th>Serial Number</th><th>Status</th><th>SAP Validation</th><th>Actions</th></tr></thead>';
                 html += '<tbody>';
                 
                 data.serial_numbers.forEach(serial => {
@@ -387,11 +387,22 @@ function showSerialNumbers(itemId, itemCode) {
                     html += `<td><code style="color: ${serial.is_validated ? '#212529' : '#dc3545'}; font-weight: bold;">${serial.serial_number}</code></td>`;
                     html += `<td><span class="badge ${serial.is_validated ? 'bg-success' : 'bg-danger'}">${serial.is_validated ? 'Validated ✓' : 'Invalid ❌'}</span></td>`;
                     html += `<td><small class="${serial.is_validated ? 'text-muted' : 'text-danger'}">${serial.validation_error || (serial.is_validated ? 'Valid in SAP B1' : 'Not validated')}</small></td>`;
+                    
+                    // Only show delete button for invalid serial numbers and if transfer is still in draft
+                    if (!serial.is_validated && data.transfer_status === 'draft') {
+                        html += `<td><button class="btn btn-sm btn-outline-danger" onclick="deleteSerialNumber(${serial.id}, '${serial.serial_number}', ${itemId})" title="Delete Invalid Serial Number"><i data-feather="trash-2"></i></button></td>`;
+                    } else {
+                        html += `<td><span class="text-muted">-</span></td>`;
+                    }
+                    
                     html += '</tr>';
                 });
                 
                 html += '</tbody></table></div>';
                 content.innerHTML = html;
+                
+                // Re-initialize Feather icons for the new content
+                feather.replace();
             } else {
                 content.innerHTML = `<div class="alert alert-danger">Error loading serial numbers: ${data.error}</div>`;
             }
@@ -480,6 +491,28 @@ function qcReject(transferId) {
         });
     } else if (qcNotes !== null) {
         alert('Rejection reason is required');
+    }
+}
+
+function deleteSerialNumber(serialId, serialNumber, itemId) {
+    if (confirm(`Are you sure you want to delete the invalid serial number "${serialNumber}"?`)) {
+        fetch(`/inventory_transfer/serial/serials/${serialId}/delete`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ Serial number ${serialNumber} deleted successfully`);
+                // Refresh the serial numbers modal to show updated list
+                showSerialNumbers(itemId, data.item_code || 'Item');
+            } else {
+                alert(`❌ Error: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Error deleting serial number');
+        });
     }
 }
 
