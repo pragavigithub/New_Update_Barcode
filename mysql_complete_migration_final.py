@@ -1144,7 +1144,7 @@ BACKUP_PATH=backups/
                     INDEX idx_transfer_item (transfer_item_id),
                     INDEX idx_serial_number (serial_number),
                     INDEX idx_is_validated (is_validated),
-                    INDEX idx_system_serial (system_serial_number),
+                    INDEX idx_system_serial (system_serial_number)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """)
             logger.info("✅ Serial number transfer serials table created")
