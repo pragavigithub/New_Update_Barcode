@@ -797,7 +797,7 @@ def serial_delete_serial_number(serial_id):
         from models import SerialNumberTransferSerial
         
         serial = SerialNumberTransferSerial.query.get_or_404(serial_id)
-        item = serial.item
+        item = serial.transfer_item
         transfer = item.serial_transfer
         
         # Check permissions
