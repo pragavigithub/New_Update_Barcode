@@ -9,7 +9,7 @@ from models import InventoryTransfer, InventoryTransferItem, User, SerialNumberT
 import logging
 from datetime import datetime
 
-transfer_bp = Blueprint('inventory_transfer', __name__, url_prefix='/inventory_transfer', template_folder='templates')
+transfer_bp = Blueprint('inventory_transfer', __name__, url_prefix='/inventory_transfer')
 
 @transfer_bp.route('/')
 @login_required
@@ -384,7 +384,7 @@ def serial_index():
         return redirect(url_for('dashboard'))
     
     transfers = SerialNumberTransfer.query.filter_by(user_id=current_user.id).order_by(SerialNumberTransfer.created_at.desc()).all()
-    return render_template('inventory_transfer/serial_transfer_index.html', transfers=transfers)
+    return render_template('serial_transfer_index.html', transfers=transfers)
 
 @transfer_bp.route('/serial/create', methods=['GET', 'POST'])
 @login_required
@@ -402,13 +402,13 @@ def serial_create():
         
         if not all([transfer_number, from_warehouse, to_warehouse]):
             flash('Transfer Number, From Warehouse, and To Warehouse are required', 'error')
-            return render_template('inventory_transfer/serial_create_transfer.html')
+            return render_template('serial_create_transfer.html')
         
         # Check if transfer already exists
         existing = SerialNumberTransfer.query.filter_by(transfer_number=transfer_number).first()
         if existing:
             flash(f'Transfer number {transfer_number} already exists', 'error')
-            return render_template('inventory_transfer/serial_create_transfer.html')
+            return render_template('serial_create_transfer.html')
         
         # Create new transfer
         transfer = SerialNumberTransfer(
@@ -427,7 +427,7 @@ def serial_create():
         flash(f'Serial Number Transfer {transfer_number} created successfully', 'success')
         return redirect(url_for('inventory_transfer.serial_detail', transfer_id=transfer.id))
     
-    return render_template('inventory_transfer/serial_create_transfer.html')
+    return render_template('serial_create_transfer.html')
 
 @transfer_bp.route('/serial/<int:transfer_id>')
 @login_required
@@ -442,7 +442,7 @@ def serial_detail(transfer_id):
         flash('Access denied - You can only view your own transfers', 'error')
         return redirect(url_for('inventory_transfer.serial_index'))
     
-    return render_template('inventory_transfer/serial_transfer_detail.html', transfer=transfer)
+    return render_template('serial_transfer_detail.html', transfer=transfer)
 
 @transfer_bp.route('/serial/<int:transfer_id>/add_item', methods=['POST'])
 @login_required

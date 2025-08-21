@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Serial Number Stock Transfer - WMS{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i data-feather="hash"></i> Serial Number Stock Transfer</h1>
+            <a href="{{ url_for('inventory_transfer.serial_create') }}" class="btn btn-primary">
+                <i data-feather="plus"></i> Create Serial Transfer
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Transfer Documents -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i data-feather="list"></i> Serial Number Transfer Documents</h5>
+            </div>
+            <div class="card-body">
+                {% if transfers %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Transfer ID</th>
+                                <th>Transfer Number</th>
+                                <th>Status</th>
+                                <th>From → To Warehouse</th>
+                                <th>Items</th>
+                                <th>SAP Document</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transfer in transfers %}
+                            <tr>
+                                <td>{{ transfer.id }}</td>
+                                <td><strong>{{ transfer.transfer_number }}</strong></td>
+                                <td>
+                                    {% if transfer.status == 'draft' %}
+                                        <span class="badge bg-secondary">Draft</span>
+                                    {% elif transfer.status == 'submitted' %}
+                                        <span class="badge bg-warning text-dark">Submitted</span>
+                                    {% elif transfer.status == 'qc_approved' %}
+                                        <span class="badge bg-success">QC Approved</span>
+                                    {% elif transfer.status == 'posted' %}
+                                        <span class="badge bg-primary">Posted</span>
+                                    {% elif transfer.status == 'rejected' %}
+                                        <span class="badge bg-danger">Rejected</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ transfer.from_warehouse }}</span>
+                                    <i data-feather="arrow-right" class="mx-1"></i>
+                                    <span class="badge bg-info">{{ transfer.to_warehouse }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">{{ transfer.items|length }} item(s)</span>
+                                </td>
+                                <td>{{ transfer.sap_document_number or 'Not Posted' }}</td>
+                                <td>{{ transfer.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="{{ url_for('inventory_transfer.serial_detail', transfer_id=transfer.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i data-feather="eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i data-feather="hash" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
+                    <h5>No Serial Number Transfers</h5>
+                    <p class="text-muted">Create your first serial number transfer to get started.</p>
+                    <a href="{{ url_for('inventory_transfer.serial_create') }}" class="btn btn-primary">
+                        <i data-feather="plus"></i> Create Serial Transfer
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info Card -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h6><i data-feather="info"></i> About Serial Number Stock Transfers</h6>
+                <p class="mb-0 text-muted">
+                    Serial Number Stock Transfers allow you to transfer items by specifying individual serial numbers. 
+                    Each serial number is validated against SAP B1 to ensure accuracy and prevent errors.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
