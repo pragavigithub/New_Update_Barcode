@@ -104,6 +104,14 @@
                                     <label class="form-check-label" for="inventory_transfer">Inventory Transfer</label>
                                 </div>
                                 <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="serial_transfer" name="serial_transfer" {{ 'checked' if user.has_permission('serial_transfer') else '' }}>
+                                    <label class="form-check-label" for="serial_transfer">Serial Transfer</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="batch_transfer" name="batch_transfer" {{ 'checked' if user.has_permission('batch_transfer') else '' }}>
+                                    <label class="form-check-label" for="batch_transfer">Batch Transfer</label>
+                                </div>
+                                <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="pick_list" name="pick_list" {{ 'checked' if user.has_permission('pick_list') else '' }}>
                                     <label class="form-check-label" for="pick_list">Pick List</label>
                                 </div>

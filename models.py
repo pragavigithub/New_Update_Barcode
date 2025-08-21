@@ -52,6 +52,8 @@ class User(UserMixin, db.Model):
             'dashboard': True,
             'grpo': False,
             'inventory_transfer': False,
+            'serial_transfer': False,
+            'batch_transfer': False,
             'pick_list': False,
             'inventory_counting': False,
             'bin_scanning': False,
@@ -68,6 +70,8 @@ class User(UserMixin, db.Model):
             permissions.update({
                 'grpo': True,
                 'inventory_transfer': True,
+                'serial_transfer': True,
+                'batch_transfer': True,
                 'pick_list': True,
                 'inventory_counting': True,
                 'bin_scanning': True,
@@ -84,6 +88,8 @@ class User(UserMixin, db.Model):
             permissions.update({
                 'grpo': True,
                 'inventory_transfer': True,
+                'serial_transfer': True,
+                'batch_transfer': True,
                 'pick_list': True,
                 'inventory_counting': True,
                 'bin_scanning': True,

@@ -379,8 +379,8 @@ def log_status_change(transfer_id, previous_status, new_status, changed_by_id, n
 @login_required
 def serial_index():
     """Serial Number Transfer main page"""
-    if not current_user.has_permission('inventory_transfer'):
-        flash('Access denied - Inventory Transfer permissions required', 'error')
+    if not current_user.has_permission('serial_transfer'):
+        flash('Access denied - Serial Transfer permissions required', 'error')
         return redirect(url_for('dashboard'))
     
     transfers = SerialNumberTransfer.query.filter_by(user_id=current_user.id).order_by(SerialNumberTransfer.created_at.desc()).all()
@@ -390,8 +390,8 @@ def serial_index():
 @login_required
 def serial_create():
     """Create new Serial Number Transfer"""
-    if not current_user.has_permission('inventory_transfer'):
-        flash('Access denied - Inventory Transfer permissions required', 'error')
+    if not current_user.has_permission('serial_transfer'):
+        flash('Access denied - Serial Transfer permissions required', 'error')
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
@@ -610,10 +610,30 @@ def serial_qc_approve(transfer_id):
         if transfer.status != 'submitted':
             return jsonify({'success': False, 'error': 'Only submitted transfers can be approved'}), 400
         
+        # Check if all serial numbers are validated before approval
+        has_invalid_serials = False
+        invalid_items = []
+        
+        for item in transfer.items:
+            invalid_serials = [s for s in item.serial_numbers if not s.is_validated]
+            if invalid_serials:
+                has_invalid_serials = True
+                invalid_items.append({
+                    'item_code': item.item_code,
+                    'invalid_count': len(invalid_serials)
+                })
+        
+        if has_invalid_serials:
+            invalid_summary = ', '.join([f"{i['item_code']} ({i['invalid_count']} invalid)" for i in invalid_items])
+            return jsonify({
+                'success': False, 
+                'error': f'Cannot approve transfer with invalid serial numbers: {invalid_summary}. Please validate all serial numbers first.'
+            }), 400
+        
         # Get QC notes
         qc_notes = request.json.get('qc_notes', '') if request.is_json else request.form.get('qc_notes', '')
         
-        # Mark items as approved
+        # Mark items as approved (only if all serials are valid)
         for item in transfer.items:
             item.qc_status = 'approved'
         
@@ -760,7 +780,7 @@ def serial_get_item_serials(item_id):
             'success': True,
             'item_code': item.item_code,
             'item_name': item.item_name,
-            'serials': serials
+            'serial_numbers': serials  # Changed from 'serials' to match template expectation
         })
         
     except Exception as e:
