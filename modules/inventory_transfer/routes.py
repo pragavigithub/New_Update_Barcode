@@ -594,6 +594,115 @@ def serial_submit(transfer_id):
         logging.error(f"Error submitting serial transfer: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@transfer_bp.route('/serial/<int:transfer_id>/qc_approve', methods=['POST'])
+@login_required
+def serial_qc_approve(transfer_id):
+    """QC approve serial number transfer and post to SAP B1"""
+    try:
+        from models import SerialNumberTransfer
+        
+        transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
+        
+        # Check QC permissions
+        if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'QC permissions required'}), 403
+        
+        if transfer.status != 'submitted':
+            return jsonify({'success': False, 'error': 'Only submitted transfers can be approved'}), 400
+        
+        # Get QC notes
+        qc_notes = request.json.get('qc_notes', '') if request.is_json else request.form.get('qc_notes', '')
+        
+        # Mark items as approved
+        for item in transfer.items:
+            item.qc_status = 'approved'
+        
+        # Update transfer status to qc_approved first
+        transfer.status = 'qc_approved'
+        transfer.qc_approver_id = current_user.id
+        transfer.qc_approved_at = datetime.utcnow()
+        transfer.qc_notes = qc_notes
+        
+        # Post to SAP B1
+        try:
+            from sap_integration import SAPIntegration
+            sap = SAPIntegration()
+            
+            sap_result = sap.create_serial_number_stock_transfer(transfer)
+            
+            if sap_result.get('success'):
+                transfer.sap_document_number = str(sap_result.get('document_number'))
+                transfer.status = 'posted'
+                message = f'Serial Number Transfer QC approved and posted to SAP B1 as {transfer.sap_document_number}'
+                logging.info(f"✅ {message}")
+            else:
+                # Keep as qc_approved but note SAP error
+                message = f'Serial Number Transfer QC approved but SAP posting failed: {sap_result.get("error")}'
+                logging.warning(f"⚠️ {message}")
+                
+        except Exception as sap_error:
+            # Keep as qc_approved but note SAP error
+            message = f'Serial Number Transfer QC approved but SAP posting failed: {str(sap_error)}'
+            logging.error(f"❌ SAP posting error: {str(sap_error)}")
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'status': transfer.status,
+            'sap_document_number': transfer.sap_document_number
+        })
+        
+    except Exception as e:
+        logging.error(f"Error approving serial transfer: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@transfer_bp.route('/serial/<int:transfer_id>/qc_reject', methods=['POST']) 
+@login_required
+def serial_qc_reject(transfer_id):
+    """QC reject serial number transfer"""
+    try:
+        from models import SerialNumberTransfer
+        
+        transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
+        
+        # Check QC permissions
+        if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'QC permissions required'}), 403
+        
+        if transfer.status != 'submitted':
+            return jsonify({'success': False, 'error': 'Only submitted transfers can be rejected'}), 400
+        
+        # Get rejection reason
+        qc_notes = request.json.get('qc_notes', '') if request.is_json else request.form.get('qc_notes', '')
+        
+        if not qc_notes:
+            return jsonify({'success': False, 'error': 'Rejection reason is required'}), 400
+        
+        # Mark items as rejected
+        for item in transfer.items:
+            item.qc_status = 'rejected'
+        
+        # Update transfer status
+        transfer.status = 'rejected'
+        transfer.qc_approver_id = current_user.id
+        transfer.qc_approved_at = datetime.utcnow()
+        transfer.qc_notes = qc_notes
+        
+        db.session.commit()
+        
+        logging.info(f"❌ Serial Number Transfer {transfer_id} rejected by QC")
+        return jsonify({
+            'success': True,
+            'message': 'Serial Number Transfer rejected by QC',
+            'status': 'rejected'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error rejecting serial transfer: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @transfer_bp.route('/serial/items/<int:item_id>/delete', methods=['POST'])
 @login_required
 def serial_delete_item(item_id):
@@ -659,68 +768,15 @@ def serial_get_item_serials(item_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def validate_serial_number_with_sap(serial_number, item_code):
-    """Validate serial number against SAP B1 API"""
+    """Validate serial number against SAP B1 API using proper SAP integration"""
     try:
-        import requests
-        from flask import current_app
-        import os
+        # Use the existing SAP integration
+        from sap_integration import SAPIntegration
         
-        # SAP B1 API endpoint - use user-provided URLs
-        base_url = os.getenv('SAP_B1_SERVER', 'https://192.168.1.5:50000')
-        api_url = f"{base_url}/b1s/v1/SerialNumberDetails"
+        sap = SAPIntegration()
+        result = sap.validate_serial_number_with_item(serial_number, item_code)
         
-        # Add filter for serial number
-        params = {
-            '$filter': f"SerialNumber eq '{serial_number}'"
-        }
-        
-        # Headers for SAP B1 API
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-        }
-        
-        # Add authentication if available
-        sap_user = os.getenv('SAP_B1_USER')
-        sap_password = os.getenv('SAP_B1_PASSWORD')
-        if sap_user and sap_password:
-            import base64
-            credentials = base64.b64encode(f"{sap_user}:{sap_password}".encode()).decode()
-            headers['Authorization'] = f'Basic {credentials}'
-        
-        # Make API call
-        response = requests.get(api_url, params=params, headers=headers, verify=False, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if data.get('value') and len(data['value']) > 0:
-                serial_data = data['value'][0]
-                
-                # Check if item code matches
-                if serial_data.get('ItemCode') == item_code:
-                    return {
-                        'valid': True,
-                        'SerialNumber': serial_data.get('SerialNumber'),
-                        'SystemNumber': serial_data.get('SystemNumber'),
-                        'ItemCode': serial_data.get('ItemCode'),
-                        'ItemDescription': serial_data.get('ItemDescription')
-                    }
-                else:
-                    return {
-                        'valid': False,
-                        'error': f'Serial number belongs to item {serial_data.get("ItemCode")}, not {item_code}'
-                    }
-            else:
-                return {
-                    'valid': False,
-                    'error': f'Serial number {serial_number} not found in SAP B1'
-                }
-        else:
-            return {
-                'valid': False,
-                'error': f'SAP API error: {response.status_code} - {response.text}'
-            }
+        return result
             
     except Exception as e:
         logging.error(f"Error validating serial number with SAP: {str(e)}")

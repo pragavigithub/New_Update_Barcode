@@ -1,77 +1,110 @@
 {% extends "base.html" %}
 
-{% block title %}Serial Transfer Detail - {{ transfer.transfer_number }}{% endblock %}
+{% block title %}
+Serial Number Transfer {{ transfer.transfer_number }}
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('inventory_transfer.serial_index') }}">Serial Number Transfer</a></li>
-                    <li class="breadcrumb-item active">{{ transfer.transfer_number }}</li>
-                </ol>
-            </nav>
-        </div>
-    </div>
-
-    <!-- Transfer Header -->
+<div class="container-fluid">
+    <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i data-feather="hash"></i> 
-                            Serial Number Transfer - {{ transfer.transfer_number }}
-                        </h5>
-                        <div>
-                            {% if transfer.status == 'draft' %}
-                                <span class="badge bg-secondary">Draft</span>
-                            {% elif transfer.status == 'submitted' %}
-                                <span class="badge bg-warning text-dark">Submitted</span>
-                            {% elif transfer.status == 'qc_approved' %}
-                                <span class="badge bg-success">QC Approved</span>
-                            {% elif transfer.status == 'posted' %}
-                                <span class="badge bg-primary">Posted</span>
-                            {% elif transfer.status == 'rejected' %}
-                                <span class="badge bg-danger">Rejected</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>Transfer Number:</strong> {{ transfer.transfer_number }}</p>
-                            <p><strong>Status:</strong> {{ transfer.status.title() }}</p>
-                            <p><strong>From Warehouse:</strong> <span class="badge bg-info">{{ transfer.from_warehouse }}</span></p>
-                            <p><strong>To Warehouse:</strong> <span class="badge bg-info">{{ transfer.to_warehouse }}</span></p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Created By:</strong> {{ transfer.user.first_name }} {{ transfer.user.last_name }}</p>
-                            <p><strong>Created At:</strong> {{ transfer.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
-                            <p><strong>SAP Document:</strong> {{ transfer.sap_document_number or 'Not Posted' }}</p>
-                            {% if transfer.notes %}
-                            <p><strong>Notes:</strong> {{ transfer.notes }}</p>
-                            {% endif %}
-                        </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2>Serial Number Transfer {{ transfer.transfer_number }}</h2>
+                    <div class="d-flex align-items-center mt-2">
+                        {% if transfer.status == 'draft' %}
+                        <span class="badge bg-secondary me-2">Draft</span>
+                        {% elif transfer.status == 'submitted' %}
+                        <span class="badge bg-warning text-dark me-2">Submitted</span>
+                        {% elif transfer.status == 'qc_approved' %}
+                        <span class="badge bg-success me-2">QC Approved</span>
+                        {% elif transfer.status == 'posted' %}
+                        <span class="badge bg-primary me-2">Posted to SAP</span>
+                        {% elif transfer.status == 'rejected' %}
+                        <span class="badge bg-danger me-2">Rejected</span>
+                        {% endif %}
+                        
+                        <small class="text-muted">
+                            Created: {{ transfer.created_at.strftime('%Y-%m-%d %H:%M') }} |
+                            From: {{ transfer.from_warehouse }} → To: {{ transfer.to_warehouse }}
+                        </small>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Transfer Items -->
+    <!-- Transfer Details -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Transfer Information</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless table-sm">
+                        <tr>
+                            <td><strong>Transfer Number:</strong></td>
+                            <td>{{ transfer.transfer_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>From Warehouse:</strong></td>
+                            <td>{{ transfer.from_warehouse }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>To Warehouse:</strong></td>
+                            <td>{{ transfer.to_warehouse }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% if transfer.status == 'draft' %}
+                                <span class="badge bg-secondary">Draft</span>
+                                {% elif transfer.status == 'submitted' %}
+                                <span class="badge bg-warning text-dark">Submitted</span>
+                                {% elif transfer.status == 'qc_approved' %}
+                                <span class="badge bg-success">QC Approved</span>
+                                {% elif transfer.status == 'posted' %}
+                                <span class="badge bg-primary">Posted to SAP</span>
+                                {% elif transfer.status == 'rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if transfer.sap_document_number %}
+                        <tr>
+                            <td><strong>SAP Document:</strong></td>
+                            <td><code>{{ transfer.sap_document_number }}</code></td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            {% if transfer.notes %}
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Notes</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ transfer.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Items -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">
-                            <i data-feather="package"></i> 
-                            Transfer Items
+                            Transfer Items 
+                            <span class="badge bg-light text-dark">{{ transfer.items|length }}</span>
                         </h6>
                         {% if transfer.status == 'draft' %}
                         <button class="btn btn-sm btn-success" onclick="showAddItemModal()">
@@ -102,7 +135,7 @@
                                     <td>
                                         <span class="badge bg-primary">{{ item.serial_numbers|length }} Serial(s)</span>
                                         <button class="btn btn-sm btn-outline-secondary ms-1" 
-                                                onclick="showSerialNumbers({{ item.id }}, '{{ item.item_code }}')">
+                                                onclick="showSerialNumbers('{{ item.id }}', '{{ item.item_code }}')">
                                             <i data-feather="list"></i> View
                                         </button>
                                     </td>
@@ -122,7 +155,7 @@
                                     </td>
                                     <td>
                                         {% if transfer.status == 'draft' %}
-                                        <button class="btn btn-sm btn-danger" onclick="removeItem({{ item.id }})">
+                                        <button class="btn btn-sm btn-danger" onclick="removeItem('{{ item.id }}')">
                                             <i data-feather="trash-2"></i>
                                         </button>
                                         {% else %}
@@ -156,7 +189,7 @@
                         </a>
                         <div>
                             {% if transfer.status == 'draft' and transfer.items %}
-                            <button class="btn btn-success" onclick="submitTransfer({{ transfer.id }})">
+                            <button class="btn btn-success" onclick="submitTransfer('{{ transfer.id }}')">
                                 <i data-feather="check"></i> Submit for QC Approval
                             </button>
                             {% elif transfer.status == 'submitted' %}
@@ -324,36 +357,32 @@ function showSerialNumbers(itemId, itemCode) {
     content.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Loading...</p></div>';
     
     fetch(`/inventory_transfer/serial/items/${itemId}/serials`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Serial Number</th><th>Status</th><th>SAP System Number</th><th>Error</th></tr></thead><tbody>';
-            
-            data.serials.forEach(serial => {
-                html += '<tr>';
-                html += `<td><strong>${serial.serial_number}</strong></td>`;
-                html += '<td>';
-                if (serial.is_validated) {
-                    html += '<span class="badge bg-success">Validated ✓</span>';
-                } else {
-                    html += '<span class="badge bg-danger">Invalid ❌</span>';
-                }
-                html += '</td>';
-                html += `<td>${serial.system_serial_number || '-'}</td>`;
-                html += `<td class="text-danger">${serial.validation_error || '-'}</td>`;
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table></div>';
-            content.innerHTML = html;
-        } else {
-            content.innerHTML = `<div class="alert alert-danger">Error loading serial numbers: ${data.error}</div>`;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        content.innerHTML = '<div class="alert alert-danger">Error loading serial numbers</div>';
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let html = '<div class="table-responsive">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>Serial Number</th><th>Status</th><th>SAP Validation</th></tr></thead>';
+                html += '<tbody>';
+                
+                data.serial_numbers.forEach(serial => {
+                    html += '<tr>';
+                    html += `<td><code>${serial.serial_number}</code></td>`;
+                    html += `<td><span class="badge ${serial.is_validated ? 'bg-success' : 'bg-warning'}">${serial.is_validated ? 'Validated' : 'Pending'}</span></td>`;
+                    html += `<td><small class="text-muted">${serial.sap_validation_result || '-'}</small></td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div>';
+                content.innerHTML = html;
+            } else {
+                content.innerHTML = `<div class="alert alert-danger">Error loading serial numbers: ${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            content.innerHTML = '<div class="alert alert-danger">Error loading serial numbers</div>';
+        });
     
     modal.show();
 }
@@ -361,10 +390,7 @@ function showSerialNumbers(itemId, itemCode) {
 function removeItem(itemId) {
     if (confirm('Are you sure you want to remove this item and all its serial numbers?')) {
         fetch(`/inventory_transfer/serial/items/${itemId}/delete`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
+            method: 'POST'
         })
         .then(response => response.json())
         .then(data => {
@@ -381,5 +407,8 @@ function removeItem(itemId) {
         });
     }
 }
+
+// Initialize Feather icons on page load
+feather.replace();
 </script>
 {% endblock %}
