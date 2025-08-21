@@ -64,7 +64,12 @@
                     {% if current_user.has_permission('inventory_transfer') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('inventory_transfer') }}">
-                            <i data-feather="move"></i> Transfer
+                            <i data-feather="move"></i> Batch Transfer
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('inventory_transfer.serial_index') }}">
+                            <i data-feather="hash"></i> Serial Transfer
                         </a>
                     </li>
                     {% endif %}
