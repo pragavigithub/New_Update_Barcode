@@ -1066,7 +1066,7 @@ class SAPIntegration:
             stock_transfer_lines.append(line)
 
         transfer_data = {
-            "DocDate": ("2024-08-12"),#datetime.now().strftime('%Y-%m-%d'),
+            "DocDate": datetime.now().strftime('%Y-%m-%d'),
             "Comments":
             f"QC Approved WMS Transfer {transfer_document.id} by {transfer_document.qc_approver.username if transfer_document.qc_approver else 'System'}",
             "FromWarehouse": transfer_document.from_warehouse,
