@@ -1069,6 +1069,86 @@ BACKUP_PATH=backups/
             """)
             logger.info("✅ QR code labels table created")
         
+        # 14. Serial Number Transfer Documents (depends on users) - NEW
+        if not self.table_exists('serial_number_transfers'):
+            logger.info("Creating serial_number_transfers table...")
+            self.execute_query("""
+                CREATE TABLE serial_number_transfers (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    transfer_number VARCHAR(50) NOT NULL UNIQUE,
+                    sap_document_number VARCHAR(50),
+                    status VARCHAR(20) DEFAULT 'draft',
+                    user_id INT NOT NULL,
+                    qc_approver_id INT,
+                    qc_approved_at DATETIME,
+                    qc_notes TEXT,
+                    from_warehouse VARCHAR(10) NOT NULL,
+                    to_warehouse VARCHAR(10) NOT NULL,
+                    priority VARCHAR(10) DEFAULT 'normal',
+                    notes TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+                    FOREIGN KEY (qc_approver_id) REFERENCES user(id) ON DELETE SET NULL,
+                    INDEX idx_transfer_number (transfer_number),
+                    INDEX idx_status (status),
+                    INDEX idx_user (user_id),
+                    INDEX idx_warehouses (from_warehouse, to_warehouse),
+                    INDEX idx_created_at (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Serial number transfers table created")
+        
+        # 15. Serial Number Transfer Items (depends on serial_number_transfers) - NEW
+        if not self.table_exists('serial_number_transfer_items'):
+            logger.info("Creating serial_number_transfer_items table...")
+            self.execute_query("""
+                CREATE TABLE serial_number_transfer_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    serial_transfer_id INT NOT NULL,
+                    item_code VARCHAR(50) NOT NULL,
+                    item_name VARCHAR(200),
+                    unit_of_measure VARCHAR(10) DEFAULT 'EA',
+                    from_warehouse_code VARCHAR(10) NOT NULL,
+                    to_warehouse_code VARCHAR(10) NOT NULL,
+                    qc_status VARCHAR(20) DEFAULT 'pending',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (serial_transfer_id) REFERENCES serial_number_transfers(id) ON DELETE CASCADE,
+                    INDEX idx_serial_transfer (serial_transfer_id),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_warehouses (from_warehouse_code, to_warehouse_code),
+                    INDEX idx_qc_status (qc_status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Serial number transfer items table created")
+        
+        # 16. Serial Number Transfer Serials (depends on serial_number_transfer_items) - NEW
+        if not self.table_exists('serial_number_transfer_serials'):
+            logger.info("Creating serial_number_transfer_serials table...")
+            self.execute_query("""
+                CREATE TABLE serial_number_transfer_serials (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    transfer_item_id INT NOT NULL,
+                    serial_number VARCHAR(100) NOT NULL,
+                    internal_serial_number VARCHAR(100) NOT NULL,
+                    system_serial_number INT,
+                    is_validated BOOLEAN DEFAULT FALSE,
+                    validation_error TEXT,
+                    manufacturing_date DATE,
+                    expiry_date DATE,
+                    admission_date DATE,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (transfer_item_id) REFERENCES serial_number_transfer_items(id) ON DELETE CASCADE,
+                    UNIQUE KEY unique_serial_per_item (transfer_item_id, serial_number),
+                    INDEX idx_transfer_item (transfer_item_id),
+                    INDEX idx_serial_number (serial_number),
+                    INDEX idx_is_validated (is_validated),
+                    INDEX idx_system_serial (system_serial_number),
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info("✅ Serial number transfer serials table created")
+        
         self.connection.commit()
         logger.info("✅ All tables created successfully!")
         return True

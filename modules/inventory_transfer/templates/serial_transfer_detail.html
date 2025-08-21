@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}Serial Transfer Detail - {{ transfer.transfer_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('inventory_transfer.serial_index') }}">Serial Number Transfer</a></li>
+                    <li class="breadcrumb-item active">{{ transfer.transfer_number }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Transfer Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i data-feather="hash"></i> 
+                            Serial Number Transfer - {{ transfer.transfer_number }}
+                        </h5>
+                        <div>
+                            {% if transfer.status == 'draft' %}
+                                <span class="badge bg-secondary">Draft</span>
+                            {% elif transfer.status == 'submitted' %}
+                                <span class="badge bg-warning text-dark">Submitted</span>
+                            {% elif transfer.status == 'qc_approved' %}
+                                <span class="badge bg-success">QC Approved</span>
+                            {% elif transfer.status == 'posted' %}
+                                <span class="badge bg-primary">Posted</span>
+                            {% elif transfer.status == 'rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Transfer Number:</strong> {{ transfer.transfer_number }}</p>
+                            <p><strong>Status:</strong> {{ transfer.status.title() }}</p>
+                            <p><strong>From Warehouse:</strong> <span class="badge bg-info">{{ transfer.from_warehouse }}</span></p>
+                            <p><strong>To Warehouse:</strong> <span class="badge bg-info">{{ transfer.to_warehouse }}</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Created By:</strong> {{ transfer.user.first_name }} {{ transfer.user.last_name }}</p>
+                            <p><strong>Created At:</strong> {{ transfer.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            <p><strong>SAP Document:</strong> {{ transfer.sap_document_number or 'Not Posted' }}</p>
+                            {% if transfer.notes %}
+                            <p><strong>Notes:</strong> {{ transfer.notes }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Items -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i data-feather="package"></i> 
+                            Transfer Items
+                        </h6>
+                        {% if transfer.status == 'draft' %}
+                        <button class="btn btn-sm btn-success" onclick="showAddItemModal()">
+                            <i data-feather="plus"></i> Add Item
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if transfer.items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Serial Numbers</th>
+                                    <th>Validated</th>
+                                    <th>From → To</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in transfer.items %}
+                                <tr>
+                                    <td><strong>{{ item.item_code }}</strong></td>
+                                    <td>{{ item.item_name }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ item.serial_numbers|length }} Serial(s)</span>
+                                        <button class="btn btn-sm btn-outline-secondary ms-1" 
+                                                onclick="showSerialNumbers({{ item.id }}, '{{ item.item_code }}')">
+                                            <i data-feather="list"></i> View
+                                        </button>
+                                    </td>
+                                    <td>
+                                        {% set validated = item.serial_numbers|selectattr("is_validated", "equalto", true)|list|length %}
+                                        {% set total = item.serial_numbers|length %}
+                                        {% if validated == total %}
+                                            <span class="badge bg-success">{{ validated }}/{{ total }} ✓</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">{{ validated }}/{{ total }} ⚠</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ item.from_warehouse_code }}</span>
+                                        <i data-feather="arrow-right" class="mx-1"></i>
+                                        <span class="badge bg-info">{{ item.to_warehouse_code }}</span>
+                                    </td>
+                                    <td>
+                                        {% if transfer.status == 'draft' %}
+                                        <button class="btn btn-sm btn-danger" onclick="removeItem({{ item.id }})">
+                                            <i data-feather="trash-2"></i>
+                                        </button>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i data-feather="info"></i>
+                        No items added to this transfer yet. Use the "Add Item" button to start adding items.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('inventory_transfer.serial_index') }}" class="btn btn-secondary">
+                            <i data-feather="arrow-left"></i> Back to Transfer List
+                        </a>
+                        <div>
+                            {% if transfer.status == 'draft' and transfer.items %}
+                            <button class="btn btn-success" onclick="submitTransfer({{ transfer.id }})">
+                                <i data-feather="check"></i> Submit for QC Approval
+                            </button>
+                            {% elif transfer.status == 'submitted' %}
+                            <div class="alert alert-info mb-0">
+                                <i data-feather="clock"></i>
+                                Transfer submitted and waiting for QC approval.
+                            </div>
+                            {% elif transfer.status == 'qc_approved' %}
+                            <div class="alert alert-success mb-0">
+                                <i data-feather="check-circle"></i>
+                                Transfer QC approved and posted to SAP B1. SAP Document: {{ transfer.sap_document_number }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Item with Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addItemForm" onsubmit="return addItemWithSerials(event);">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="item_code" class="form-label">Item Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="item_code" name="item_code" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="item_name" class="form-label">Item Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="item_name" name="item_name" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="serial_numbers" class="form-label">Serial Numbers <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="serial_numbers" name="serial_numbers" rows="8" required
+                                  placeholder="Enter serial numbers (one per line, or separated by commas/spaces)&#10;Example:&#10;SRRR104&#10;SRRR105&#10;SRRR106"></textarea>
+                        <small class="text-muted">
+                            Each serial number will be validated against SAP B1 and checked against the specified Item Code.
+                        </small>
+                    </div>
+                    
+                    <div id="validationResults" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-feather="plus"></i> Add Item & Validate Serials
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Serial Numbers Modal -->
+<div class="modal fade" id="serialNumbersModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="serialNumbersContent">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAddItemModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    modal.show();
+}
+
+function addItemWithSerials(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Validating...';
+    
+    fetch(`/inventory_transfer/serial/{{ transfer.id }}/add_item`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ ${data.message}`);
+            location.reload();
+        } else {
+            alert(`❌ Error: ${data.error}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error adding item');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-feather="plus"></i> Add Item & Validate Serials';
+    });
+    
+    return false;
+}
+
+function submitTransfer(transferId) {
+    if (confirm('Are you sure you want to submit this transfer? All serial numbers must be validated.')) {
+        fetch(`/inventory_transfer/serial/${transferId}/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ ${data.message}`);
+                location.reload();
+            } else {
+                alert(`❌ Error: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Error submitting transfer');
+        });
+    }
+}
+
+function showSerialNumbers(itemId, itemCode) {
+    const modal = new bootstrap.Modal(document.getElementById('serialNumbersModal'));
+    const content = document.getElementById('serialNumbersContent');
+    
+    // Update modal title
+    document.querySelector('#serialNumbersModal .modal-title').textContent = `Serial Numbers for ${itemCode}`;
+    
+    // Load serial numbers for this item
+    {% for item in transfer.items %}
+    if ({{ item.id }} === itemId) {
+        let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Serial Number</th><th>Status</th><th>SAP System Number</th><th>Error</th></tr></thead><tbody>';
+        
+        {% for serial in item.serial_numbers %}
+        html += '<tr>';
+        html += '<td><strong>{{ serial.serial_number }}</strong></td>';
+        html += '<td>';
+        {% if serial.is_validated %}
+        html += '<span class="badge bg-success">Validated ✓</span>';
+        {% else %}
+        html += '<span class="badge bg-danger">Invalid ❌</span>';
+        {% endif %}
+        html += '</td>';
+        html += '<td>{{ serial.system_serial_number or "-" }}</td>';
+        html += '<td class="text-danger">{{ serial.validation_error or "-" }}</td>';
+        html += '</tr>';
+        {% endfor %}
+        
+        html += '</tbody></table></div>';
+        content.innerHTML = html;
+    }
+    {% endfor %}
+    
+    modal.show();
+}
+
+function removeItem(itemId) {
+    if (confirm('Are you sure you want to remove this item and all its serial numbers?')) {
+        // Implementation would be similar to regular inventory transfer
+        alert('Remove item functionality to be implemented');
+    }
+}
+</script>
+{% endblock %}

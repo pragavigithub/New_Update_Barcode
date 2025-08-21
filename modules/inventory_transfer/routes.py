@@ -10,7 +10,7 @@ from modules.shared.models import User
 import logging
 from datetime import datetime
 
-transfer_bp = Blueprint('inventory_transfer', __name__, url_prefix='/inventory_transfer')
+transfer_bp = Blueprint('inventory_transfer', __name__, url_prefix='/inventory_transfer', template_folder='templates')
 
 @transfer_bp.route('/')
 @login_required
@@ -369,3 +369,285 @@ def log_status_change(transfer_id, previous_status, new_status, changed_by_id, n
         db.session.commit()
     except Exception as e:
         logging.error(f"Error logging status change: {str(e)}")
+
+# ==========================
+# Serial Number Transfer Routes
+# ==========================
+
+@transfer_bp.route('/serial')
+@login_required
+def serial_index():
+    """Serial Number Transfer main page"""
+    if not current_user.has_permission('inventory_transfer'):
+        flash('Access denied - Inventory Transfer permissions required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    from .models import SerialNumberTransfer
+    transfers = SerialNumberTransfer.query.filter_by(user_id=current_user.id).order_by(SerialNumberTransfer.created_at.desc()).all()
+    return render_template('inventory_transfer/serial_transfer_index.html', transfers=transfers)
+
+@transfer_bp.route('/serial/create', methods=['GET', 'POST'])
+@login_required
+def serial_create():
+    """Create new Serial Number Transfer"""
+    if not current_user.has_permission('inventory_transfer'):
+        flash('Access denied - Inventory Transfer permissions required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        from .models import SerialNumberTransfer
+        
+        transfer_number = request.form.get('transfer_number')
+        from_warehouse = request.form.get('from_warehouse')
+        to_warehouse = request.form.get('to_warehouse')
+        notes = request.form.get('notes', '')
+        
+        if not all([transfer_number, from_warehouse, to_warehouse]):
+            flash('Transfer Number, From Warehouse, and To Warehouse are required', 'error')
+            return render_template('inventory_transfer/serial_create_transfer.html')
+        
+        # Check if transfer already exists
+        existing = SerialNumberTransfer.query.filter_by(transfer_number=transfer_number).first()
+        if existing:
+            flash(f'Transfer number {transfer_number} already exists', 'error')
+            return render_template('inventory_transfer/serial_create_transfer.html')
+        
+        # Create new transfer
+        transfer = SerialNumberTransfer(
+            transfer_number=transfer_number,
+            user_id=current_user.id,
+            from_warehouse=from_warehouse,
+            to_warehouse=to_warehouse,
+            notes=notes,
+            status='draft'
+        )
+        
+        db.session.add(transfer)
+        db.session.commit()
+        
+        logging.info(f"✅ Serial Number Transfer {transfer_number} created by user {current_user.username}")
+        flash(f'Serial Number Transfer {transfer_number} created successfully', 'success')
+        return redirect(url_for('inventory_transfer.serial_detail', transfer_id=transfer.id))
+    
+    return render_template('inventory_transfer/serial_create_transfer.html')
+
+@transfer_bp.route('/serial/<int:transfer_id>')
+@login_required
+def serial_detail(transfer_id):
+    """Serial Number Transfer detail page"""
+    from .models import SerialNumberTransfer
+    
+    transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
+    
+    # Check permissions
+    if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager', 'qc']:
+        flash('Access denied - You can only view your own transfers', 'error')
+        return redirect(url_for('inventory_transfer.serial_index'))
+    
+    return render_template('inventory_transfer/serial_transfer_detail.html', transfer=transfer)
+
+@transfer_bp.route('/serial/<int:transfer_id>/add_item', methods=['POST'])
+@login_required
+def serial_add_item(transfer_id):
+    """Add item to Serial Number Transfer"""
+    from .models import SerialNumberTransfer, SerialNumberTransferItem, SerialNumberTransferSerial
+    
+    try:
+        transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
+        
+        # Check permissions
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot add items to non-draft transfer'}), 400
+        
+        # Get form data
+        item_code = request.form.get('item_code')
+        item_name = request.form.get('item_name')
+        serial_numbers_text = request.form.get('serial_numbers', '')
+        
+        if not all([item_code, item_name, serial_numbers_text]):
+            return jsonify({'success': False, 'error': 'Item Code, Item Name, and Serial Numbers are required'}), 400
+        
+        # Parse serial numbers (split by newlines, commas, or spaces)
+        import re
+        serial_numbers = re.split(r'[,\n\r\s]+', serial_numbers_text.strip())
+        serial_numbers = [sn.strip() for sn in serial_numbers if sn.strip()]
+        
+        if not serial_numbers:
+            return jsonify({'success': False, 'error': 'At least one serial number is required'}), 400
+        
+        # Check if this item already exists in this transfer
+        existing_item = SerialNumberTransferItem.query.filter_by(
+            serial_transfer_id=transfer_id,
+            item_code=item_code
+        ).first()
+        
+        if existing_item:
+            return jsonify({'success': False, 'error': f'Item {item_code} already exists in this transfer'}), 400
+        
+        # Create transfer item
+        transfer_item = SerialNumberTransferItem(
+            serial_transfer_id=transfer_id,
+            item_code=item_code,
+            item_name=item_name,
+            from_warehouse_code=transfer.from_warehouse,
+            to_warehouse_code=transfer.to_warehouse
+        )
+        
+        db.session.add(transfer_item)
+        db.session.flush()  # Get the ID
+        
+        # Validate serial numbers against SAP and add them
+        validated_count = 0
+        for serial_number in serial_numbers:
+            try:
+                # Validate serial number against SAP
+                validation_result = validate_serial_number_with_sap(serial_number, item_code)
+                
+                serial_record = SerialNumberTransferSerial(
+                    transfer_item_id=transfer_item.id,
+                    serial_number=serial_number,
+                    internal_serial_number=validation_result.get('SerialNumber', serial_number),
+                    system_serial_number=validation_result.get('SystemNumber'),
+                    is_validated=validation_result.get('valid', False),
+                    validation_error=validation_result.get('error')
+                )
+                
+                if validation_result.get('valid'):
+                    validated_count += 1
+                
+                db.session.add(serial_record)
+                
+            except Exception as e:
+                logging.error(f"Error validating serial number {serial_number}: {str(e)}")
+                # Add as unvalidated
+                serial_record = SerialNumberTransferSerial(
+                    transfer_item_id=transfer_item.id,
+                    serial_number=serial_number,
+                    internal_serial_number=serial_number,
+                    is_validated=False,
+                    validation_error=str(e)
+                )
+                db.session.add(serial_record)
+        
+        db.session.commit()
+        
+        logging.info(f"✅ Item {item_code} with {len(serial_numbers)} serial numbers added to transfer {transfer_id}")
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Item {item_code} added with {len(serial_numbers)} serial numbers ({validated_count} validated)',
+            'validated_count': validated_count,
+            'total_count': len(serial_numbers)
+        })
+        
+    except Exception as e:
+        logging.error(f"Error adding item to serial transfer: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@transfer_bp.route('/serial/<int:transfer_id>/submit', methods=['POST'])
+@login_required
+def serial_submit(transfer_id):
+    """Submit Serial Number Transfer for QC approval"""
+    from .models import SerialNumberTransfer
+    
+    try:
+        transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
+        
+        # Check permissions
+        if transfer.user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Only draft transfers can be submitted'}), 400
+        
+        if not transfer.items:
+            return jsonify({'success': False, 'error': 'Cannot submit transfer without items'}), 400
+        
+        # Check if all serial numbers are validated
+        unvalidated_count = 0
+        for item in transfer.items:
+            for serial in item.serial_numbers:
+                if not serial.is_validated:
+                    unvalidated_count += 1
+        
+        if unvalidated_count > 0:
+            return jsonify({
+                'success': False, 
+                'error': f'{unvalidated_count} serial numbers are not validated. Please validate all serial numbers before submitting.'
+            }), 400
+        
+        # Update status
+        transfer.status = 'submitted'
+        transfer.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        logging.info(f"📤 Serial Number Transfer {transfer_id} submitted for QC approval")
+        return jsonify({
+            'success': True,
+            'message': 'Serial Number Transfer submitted for QC approval',
+            'status': 'submitted'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error submitting serial transfer: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def validate_serial_number_with_sap(serial_number, item_code):
+    """Validate serial number against SAP B1 API"""
+    try:
+        import requests
+        from flask import current_app
+        
+        # SAP B1 API endpoint
+        base_url = current_app.config.get('SAP_B1_SERVER', 'https://192.168.1.5:50000')
+        api_url = f"{base_url}/b1s/v1/SerialNumberDetails"
+        
+        # Add filter for serial number
+        params = {
+            '$filter': f"SerialNumber eq '{serial_number}'"
+        }
+        
+        # Make API call (you'll need to handle authentication)
+        response = requests.get(api_url, params=params, verify=False, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data.get('value') and len(data['value']) > 0:
+                serial_data = data['value'][0]
+                
+                # Check if item code matches
+                if serial_data.get('ItemCode') == item_code:
+                    return {
+                        'valid': True,
+                        'SerialNumber': serial_data.get('SerialNumber'),
+                        'SystemNumber': serial_data.get('SystemNumber'),
+                        'ItemCode': serial_data.get('ItemCode'),
+                        'ItemDescription': serial_data.get('ItemDescription')
+                    }
+                else:
+                    return {
+                        'valid': False,
+                        'error': f'Serial number belongs to item {serial_data.get("ItemCode")}, not {item_code}'
+                    }
+            else:
+                return {
+                    'valid': False,
+                    'error': f'Serial number {serial_number} not found in SAP B1'
+                }
+        else:
+            return {
+                'valid': False,
+                'error': f'SAP API error: {response.status_code} - {response.text}'
+            }
+            
+    except Exception as e:
+        logging.error(f"Error validating serial number with SAP: {str(e)}")
+        return {
+            'valid': False,
+            'error': f'Validation error: {str(e)}'
+        }
