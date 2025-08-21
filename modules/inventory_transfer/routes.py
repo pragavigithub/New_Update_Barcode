@@ -5,8 +5,7 @@ All routes related to inventory transfers between warehouses/bins
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
-from models import InventoryTransfer, InventoryTransferItem
-from models import User
+from models import InventoryTransfer, InventoryTransferItem, User, SerialNumberTransfer, SerialNumberTransferItem, SerialNumberTransferSerial
 import logging
 from datetime import datetime
 
@@ -384,7 +383,6 @@ def serial_index():
         flash('Access denied - Inventory Transfer permissions required', 'error')
         return redirect(url_for('dashboard'))
     
-    from .models import SerialNumberTransfer
     transfers = SerialNumberTransfer.query.filter_by(user_id=current_user.id).order_by(SerialNumberTransfer.created_at.desc()).all()
     return render_template('inventory_transfer/serial_transfer_index.html', transfers=transfers)
 
@@ -397,8 +395,6 @@ def serial_create():
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        from .models import SerialNumberTransfer
-        
         transfer_number = request.form.get('transfer_number')
         from_warehouse = request.form.get('from_warehouse')
         to_warehouse = request.form.get('to_warehouse')
@@ -437,7 +433,7 @@ def serial_create():
 @login_required
 def serial_detail(transfer_id):
     """Serial Number Transfer detail page"""
-    from .models import SerialNumberTransfer
+    from models import SerialNumberTransfer
     
     transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
     
@@ -452,7 +448,7 @@ def serial_detail(transfer_id):
 @login_required
 def serial_add_item(transfer_id):
     """Add item to Serial Number Transfer"""
-    from .models import SerialNumberTransfer, SerialNumberTransferItem, SerialNumberTransferSerial
+    from models import SerialNumberTransfer, SerialNumberTransferItem, SerialNumberTransferSerial
     
     try:
         transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
@@ -554,7 +550,7 @@ def serial_add_item(transfer_id):
 @login_required
 def serial_submit(transfer_id):
     """Submit Serial Number Transfer for QC approval"""
-    from .models import SerialNumberTransfer
+    from models import SerialNumberTransfer
     
     try:
         transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
