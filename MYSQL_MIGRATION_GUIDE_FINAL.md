@@ -11,6 +11,7 @@ This guide consolidates ALL MySQL migration needs into a single comprehensive sc
 - ✅ Branch Management
 - ✅ GRPO (Goods Receipt Purchase Order) with line items
 - ✅ Inventory Transfer with line items and warehouse support
+- ✅ Serial Number Transfer with warehouse-specific validation (Updated 2025-08-22)
 - ✅ Pick List Management with SAP B1 integration (ps_released focus)
 - ✅ Pick List Lines and Bin Allocations (SAP B1 compatible)
 - ✅ Sales Orders and Sales Order Lines (for enhanced picklist integration)
@@ -21,6 +22,13 @@ This guide consolidates ALL MySQL migration needs into a single comprehensive sc
 - ✅ Foreign key relationships
 - ✅ Default user accounts
 - ✅ Comprehensive .env file generation
+
+## Recent Changes (2025-08-22)
+### Serial Number Transfer Validation Enhancement
+- ✅ Fixed validation logic to properly reject serial numbers not available in FromWarehouse
+- ✅ Serial numbers not available in FromWarehouse now display as red with delete option
+- ✅ Only serial numbers available in FromWarehouse are marked as valid for stock transfer
+- ✅ Fixed import errors in serial number edit functionality
 
 ## How to Run
 

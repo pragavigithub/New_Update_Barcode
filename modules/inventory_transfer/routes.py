@@ -845,7 +845,7 @@ def serial_edit_serial_number(serial_id):
     """Edit an existing serial number in a transfer"""
     try:
         from models import SerialNumberTransferSerial
-        from sap_integration import validate_serial_number_with_sap
+        # Using the warehouse-specific validation function defined above
         
         serial_record = SerialNumberTransferSerial.query.get_or_404(serial_id)
         transfer_item = serial_record.transfer_item
@@ -878,7 +878,7 @@ def serial_edit_serial_number(serial_id):
                 'error': f'Serial number {new_serial_number} already exists in this transfer'
             }), 400
         
-        # Validate new serial number against SAP
+        # Validate new serial number against SAP with warehouse availability check
         validation_result = validate_series_with_warehouse_sap(new_serial_number, transfer_item.item_code, transfer.from_warehouse)
         
         # Update the serial number
@@ -926,20 +926,13 @@ def validate_series_with_warehouse_sap(serial_number, item_code, warehouse_code)
                 'validation_type': 'warehouse_specific'
             }
         elif warehouse_result.get('valid') and not warehouse_result.get('available_in_warehouse'):
-            # Series exists but no stock - fallback to basic validation
-            basic_result = sap.validate_serial_number_with_item(serial_number, item_code)
-            if basic_result.get('valid'):
-                return {
-                    'valid': True,
-                    'SerialNumber': basic_result.get('SerialNumber'),
-                    'SystemNumber': basic_result.get('SystemNumber'),
-                    'ItemCode': basic_result.get('ItemCode'),
-                    'warning': warehouse_result.get('warning'),
-                    'available_in_warehouse': False,
-                    'validation_type': 'basic_fallback'
-                }
-            else:
-                return basic_result
+            # Series exists but not available in the FromWarehouse - REJECT for stock transfer
+            return {
+                'valid': False,
+                'error': warehouse_result.get('warning') or f'Series {serial_number} is not available in warehouse {warehouse_code}',
+                'available_in_warehouse': False,
+                'validation_type': 'warehouse_unavailable'
+            }
         else:
             # Validation failed
             return warehouse_result
