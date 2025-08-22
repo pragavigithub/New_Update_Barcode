@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app import db
 from models import InventoryTransfer, InventoryTransferItem, User, SerialNumberTransfer, SerialNumberTransferItem, SerialNumberTransferSerial
+from sqlalchemy import or_
 import logging
 import random
 import string
@@ -395,13 +396,54 @@ def log_status_change(transfer_id, previous_status, new_status, changed_by_id, n
 @transfer_bp.route('/serial')
 @login_required
 def serial_index():
-    """Serial Number Transfer main page"""
+    """Serial Number Transfer main page with pagination and user filtering"""
     if not current_user.has_permission('serial_transfer'):
         flash('Access denied - Serial Transfer permissions required', 'error')
         return redirect(url_for('dashboard'))
     
-    transfers = SerialNumberTransfer.query.filter_by(user_id=current_user.id).order_by(SerialNumberTransfer.created_at.desc()).all()
-    return render_template('serial_transfer_index.html', transfers=transfers)
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    search = request.args.get('search', '', type=str)
+    user_based = request.args.get('user_based', 'true')  # Default to user-based filtering
+    
+    # Ensure per_page is within allowed range
+    if per_page not in [10, 25, 50, 100]:
+        per_page = 10
+    
+    # Build base query
+    query = SerialNumberTransfer.query
+    
+    # Apply user-based filtering
+    if user_based == 'true' or current_user.role not in ['admin', 'manager']:
+        # Show only current user's transfers (or force for non-admin users)
+        query = query.filter_by(user_id=current_user.id)
+    
+    # Apply search filter if provided
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                SerialNumberTransfer.transfer_number.ilike(search_filter),
+                SerialNumberTransfer.from_warehouse.ilike(search_filter),
+                SerialNumberTransfer.to_warehouse.ilike(search_filter),
+                SerialNumberTransfer.status.ilike(search_filter)
+            )
+        )
+    
+    # Order and paginate
+    query = query.order_by(SerialNumberTransfer.created_at.desc())
+    transfers_paginated = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return render_template('serial_transfer_index.html', 
+                         transfers=transfers_paginated.items,
+                         pagination=transfers_paginated,
+                         search=search,
+                         per_page=per_page,
+                         user_based=user_based,
+                         current_user=current_user)
 
 @transfer_bp.route('/serial/create', methods=['GET', 'POST'])
 @login_required

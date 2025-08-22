@@ -30,6 +30,13 @@ This guide consolidates ALL MySQL migration needs into a single comprehensive sc
 - ✅ Only serial numbers available in FromWarehouse are marked as valid for stock transfer
 - ✅ Fixed import errors in serial number edit functionality
 
+### Serial Transfer Index Page Enhancement
+- ✅ Added pagination with configurable rows per page (10, 25, 50, 100)
+- ✅ Added search functionality across transfer number, warehouse, and status
+- ✅ Added user-based filtering option for admin/manager users
+- ✅ Enhanced UI with search controls and pagination navigation
+- ✅ Auto-submit filters for better user experience
+
 ## How to Run
 
 ### Step 1: Prepare MySQL Database
