@@ -37,6 +37,13 @@ This guide consolidates ALL MySQL migration needs into a single comprehensive sc
 - ✅ Enhanced UI with search controls and pagination navigation
 - ✅ Auto-submit filters for better user experience
 
+### Rejected Transfer Reopen Functionality
+- ✅ Added "Reopen Transfer" button for rejected transfers
+- ✅ Only admin, manager, or transfer owner can reopen rejected transfers
+- ✅ Reopening resets status to 'draft' and clears QC rejection data
+- ✅ Allows users to modify and resubmit previously rejected transfers
+- ✅ Proper permission checking and status validation
+
 ## How to Run
 
 ### Step 1: Prepare MySQL Database

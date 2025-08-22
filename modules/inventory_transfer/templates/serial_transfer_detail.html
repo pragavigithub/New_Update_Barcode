@@ -218,6 +218,11 @@ Serial Number Transfer {{ transfer.transfer_number }}
                                 <i data-feather="x-circle"></i>
                                 Transfer rejected by QC: {{ transfer.qc_notes }}
                             </div>
+                            {% if current_user.role in ['admin', 'manager'] or transfer.user_id == current_user.id %}
+                            <button class="btn btn-warning mt-2" onclick="reopenTransfer('{{ transfer.id }}')">
+                                <i data-feather="refresh-cw"></i> Reopen Transfer
+                            </button>
+                            {% endif %}
                             {% endif %}
                         </div>
                     </div>
@@ -501,6 +506,30 @@ function qcReject(transferId) {
         });
     } else if (qcNotes !== null) {
         alert('Rejection reason is required');
+    }
+}
+
+function reopenTransfer(transferId) {
+    if (confirm('Are you sure you want to reopen this rejected transfer? It will be changed back to Draft status and you can make modifications.')) {
+        fetch(`/inventory_transfer/serial/${transferId}/reopen`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ ${data.message}`);
+                location.reload();
+            } else {
+                alert(`❌ Error: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Error reopening transfer');
+        });
     }
 }
 
