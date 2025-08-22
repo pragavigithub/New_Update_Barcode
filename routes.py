@@ -2968,7 +2968,7 @@ def edit_user(user_id):
         user.email = request.form['email']
         user.role = request.form['role']
         user.default_branch_id = request.form.get('default_branch_id') or None
-        user.is_active = 'is_active' in request.form
+        user.active = 'is_active' in request.form
         user.must_change_password = 'must_change_password' in request.form
         
         # Update permissions
@@ -3066,7 +3066,7 @@ def activate_user(user_id):
         return redirect(url_for('dashboard'))
     
     user = User.query.get_or_404(user_id)
-    user.is_active = True
+    user.active = True
     user.updated_at = datetime.utcnow()
     
     db.session.commit()
@@ -3088,7 +3088,7 @@ def deactivate_user(user_id):
         flash('You cannot deactivate your own account.', 'error')
         return redirect(url_for('user_management'))
     
-    user.is_active = False
+    user.active = False
     user.updated_at = datetime.utcnow()
     
     db.session.commit()
@@ -3133,7 +3133,7 @@ def create_branch():
     
     # Insert new branch
     db.session.execute(db.text("""
-        INSERT INTO branches (id, name, address, phone, email, manager_name, is_default, is_active)
+        INSERT INTO branches (id, name, address, phone, email, manager_name, is_default, active)
         VALUES (:id, :name, :address, :phone, :email, :manager_name, :is_default, TRUE)
     """), {
         "id": branch_id,
@@ -3161,7 +3161,7 @@ def edit_branch(branch_id):
     phone = request.form.get('phone', '')
     email = request.form.get('email', '')
     manager_name = request.form.get('manager_name', '')
-    is_active = 'is_active' in request.form
+    active = 'is_active' in request.form
     is_default = 'is_default' in request.form
     
     # Check if branch exists
@@ -3182,7 +3182,7 @@ def edit_branch(branch_id):
         phone = :phone, 
         email = :email, 
         manager_name = :manager_name, 
-        is_active = :is_active, 
+        active = :active, 
         is_default = :is_default
         WHERE id = :id
     """), {
@@ -3192,7 +3192,7 @@ def edit_branch(branch_id):
         "phone": phone,
         "email": email,
         "manager_name": manager_name,
-        "is_active": is_active,
+        "active": active,
         "is_default": is_default
     })
     
