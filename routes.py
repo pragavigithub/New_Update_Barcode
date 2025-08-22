@@ -333,7 +333,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
-            if user.is_active:
+            if user.active:
                 # Update branch - use provided branch, default branch, or 'HQ001'
                 if branch_id:
                     user.branch_id = branch_id
@@ -362,7 +362,7 @@ def login():
     
     # Get available branches for login form
     try:
-        branches = db.session.execute(db.text("SELECT branch_code as id, branch_name as name FROM branches WHERE is_active = TRUE ORDER BY branch_name")).fetchall()
+        branches = db.session.execute(db.text("SELECT branch_code as id, branch_name as name FROM branches WHERE active = TRUE ORDER BY branch_name")).fetchall()
     except Exception as e:
         logging.warning(f"Branches query failed, using default: {e}")
         branches = [{'id': '01', 'name': 'Main Branch'}]
@@ -2831,7 +2831,7 @@ def user_management():
     
     users = User.query.all()
     try:
-        branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+        branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE active = TRUE ORDER BY name")).fetchall()
     except Exception as e:
         logging.warning(f"Could not load branches: {e}")
         branches = []
@@ -2920,7 +2920,7 @@ def edit_user(user_id):
         flash(f'User {user.username} updated successfully!', 'success')
         return redirect(url_for('user_management'))
     
-    branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+    branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE active = TRUE ORDER BY name")).fetchall()
     return render_template('edit_user.html', user=user, branches=branches)
 
 @app.route('/reset_password/<int:user_id>', methods=['POST'])

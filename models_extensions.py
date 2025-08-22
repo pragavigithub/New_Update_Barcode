@@ -20,7 +20,7 @@ class Branch(db.Model):
     email = db.Column(db.String(120), nullable=True)
     manager_name = db.Column(db.String(100), nullable=True)
     warehouse_codes = db.Column(db.Text, nullable=True)  # JSON array of warehouse codes
-    is_active = db.Column(db.Boolean, default=True)
+    active = db.Column(db.Boolean, default=True)
     is_default = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -50,7 +50,7 @@ class UserSession(db.Model):
     logout_time = db.Column(db.DateTime, nullable=True)
     ip_address = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.Text, nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
+    active = db.Column(db.Boolean, default=True)
 
 class PasswordResetToken(db.Model):
     """Password reset tokens for users"""

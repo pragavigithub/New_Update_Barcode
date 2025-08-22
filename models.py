@@ -20,7 +20,7 @@ class User(UserMixin, db.Model):
     branch_name = db.Column(db.String(100), nullable=True)
     default_branch_id = db.Column(
         db.String(10), nullable=True)  # Default branch if none selected
-    is_active = db.Column(db.Boolean, default=True)
+    active = db.Column(db.Boolean, default=True)
     must_change_password = db.Column(
         db.Boolean, default=False)  # Force password change on next login
     last_login = db.Column(db.DateTime, nullable=True)
@@ -423,7 +423,7 @@ class BinLocation(db.Model):
     bin_code = db.Column(db.String(100), unique=True, nullable=False)
     warehouse_code = db.Column(db.String(50), nullable=False)
     description = db.Column(db.String(255), nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
+    active = db.Column(db.Boolean, default=True)
     is_system_bin = db.Column(db.Boolean, default=False)
     sap_abs_entry = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
