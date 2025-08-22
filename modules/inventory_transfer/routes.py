@@ -7,9 +7,24 @@ from flask_login import login_required, current_user
 from app import db
 from models import InventoryTransfer, InventoryTransferItem, User, SerialNumberTransfer, SerialNumberTransferItem, SerialNumberTransferSerial
 import logging
+import random
+import string
 from datetime import datetime
 
 transfer_bp = Blueprint('inventory_transfer', __name__, url_prefix='/inventory_transfer')
+
+def generate_transfer_number():
+    """Generate unique transfer number for serial transfers"""
+    while True:
+        # Generate format: ST-YYYYMMDD-XXXX (e.g., ST-20250822-A1B2)
+        date_part = datetime.now().strftime('%Y%m%d')
+        random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        transfer_number = f'ST-{date_part}-{random_part}'
+        
+        # Check if it already exists
+        existing = SerialNumberTransfer.query.filter_by(transfer_number=transfer_number).first()
+        if not existing:
+            return transfer_number
 
 @transfer_bp.route('/')
 @login_required
@@ -395,22 +410,17 @@ def serial_create():
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        transfer_number = request.form.get('transfer_number')
+        # Auto-generate transfer number
+        transfer_number = generate_transfer_number()
         from_warehouse = request.form.get('from_warehouse')
         to_warehouse = request.form.get('to_warehouse')
         notes = request.form.get('notes', '')
         
-        if not all([transfer_number, from_warehouse, to_warehouse]):
-            flash('Transfer Number, From Warehouse, and To Warehouse are required', 'error')
+        if not all([from_warehouse, to_warehouse]):
+            flash('From Warehouse and To Warehouse are required', 'error')
             return render_template('serial_create_transfer.html')
         
-        # Check if transfer already exists
-        existing = SerialNumberTransfer.query.filter_by(transfer_number=transfer_number).first()
-        if existing:
-            flash(f'Transfer number {transfer_number} already exists', 'error')
-            return render_template('serial_create_transfer.html')
-        
-        # Create new transfer
+        # Create new transfer with auto-generated number
         transfer = SerialNumberTransfer(
             transfer_number=transfer_number,
             user_id=current_user.id,
@@ -825,6 +835,71 @@ def serial_delete_serial_number(serial_id):
         
     except Exception as e:
         logging.error(f"Error deleting serial number: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@transfer_bp.route('/serial/serials/<int:serial_id>/edit', methods=['POST'])
+@login_required
+def serial_edit_serial_number(serial_id):
+    """Edit an existing serial number in a transfer"""
+    try:
+        from models import SerialNumberTransferSerial
+        from sap_integration import validate_serial_number_with_sap
+        
+        serial_record = SerialNumberTransferSerial.query.get_or_404(serial_id)
+        transfer_item = serial_record.transfer_item
+        transfer = transfer_item.serial_transfer
+        
+        # Check permissions
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Can only edit serial numbers in draft transfers'}), 400
+        
+        # Get new serial number from form data
+        new_serial_number = request.form.get('new_serial_number', '').strip()
+        if not new_serial_number:
+            return jsonify({'success': False, 'error': 'New serial number is required'}), 400
+        
+        old_serial_number = serial_record.serial_number
+        
+        # Check if new serial number already exists in this transfer
+        existing = SerialNumberTransferSerial.query.join(SerialNumberTransferItem).filter(
+            SerialNumberTransferItem.serial_transfer_id == transfer.id,
+            SerialNumberTransferSerial.serial_number == new_serial_number,
+            SerialNumberTransferSerial.id != serial_id
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'success': False, 
+                'error': f'Serial number {new_serial_number} already exists in this transfer'
+            }), 400
+        
+        # Validate new serial number against SAP
+        validation_result = validate_serial_number_with_sap(new_serial_number, transfer_item.item_code)
+        
+        # Update the serial number
+        serial_record.serial_number = new_serial_number
+        serial_record.is_validated = validation_result.get('valid', False)
+        serial_record.validation_error = validation_result.get('error') if not validation_result.get('valid') else None
+        serial_record.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        logging.info(f"📝 Serial number updated from {old_serial_number} to {new_serial_number} in transfer {transfer.id}")
+        return jsonify({
+            'success': True,
+            'message': f'Serial number updated from {old_serial_number} to {new_serial_number}',
+            'serial_number': new_serial_number,
+            'is_validated': serial_record.is_validated,
+            'validation_error': serial_record.validation_error,
+            'item_code': transfer_item.item_code
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error editing serial number: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def validate_serial_number_with_sap(serial_number, item_code):
