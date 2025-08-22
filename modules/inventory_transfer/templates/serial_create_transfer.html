@@ -28,24 +28,25 @@
                     <form method="POST">
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="transfer_number" class="form-label">Transfer Number <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="transfer_number" name="transfer_number" required 
-                                           placeholder="Enter unique transfer number">
+                                <div class="alert alert-info">
+                                    <i data-feather="info"></i>
+                                    <strong>Transfer Number:</strong> Will be automatically generated (Format: ST-YYYYMMDD-XXXX)
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="from_warehouse" class="form-label">From Warehouse <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="from_warehouse" name="from_warehouse" required
-                                           placeholder="e.g., 7000-FG">
+                                    <select class="form-control" id="from_warehouse" name="from_warehouse" required>
+                                        <option value="">Select warehouse...</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="to_warehouse" class="form-label">To Warehouse <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="to_warehouse" name="to_warehouse" required
-                                           placeholder="e.g., 7000-QFG">
+                                    <select class="form-control" id="to_warehouse" name="to_warehouse" required>
+                                        <option value="">Select warehouse...</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -88,4 +89,73 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load warehouses from API on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadWarehouses();
+});
+
+function loadWarehouses() {
+    fetch('/api/warehouses')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.warehouses) {
+                const fromWarehouse = document.getElementById('from_warehouse');
+                const toWarehouse = document.getElementById('to_warehouse');
+                
+                // Clear existing options except first one
+                fromWarehouse.innerHTML = '<option value="">Select warehouse...</option>';
+                toWarehouse.innerHTML = '<option value="">Select warehouse...</option>';
+                
+                // Add warehouse options
+                data.warehouses.forEach(warehouse => {
+                    const option1 = new Option(
+                        `${warehouse.WarehouseCode} - ${warehouse.WarehouseName}`,
+                        warehouse.WarehouseCode
+                    );
+                    const option2 = option1.cloneNode(true);
+                    
+                    fromWarehouse.appendChild(option1);
+                    toWarehouse.appendChild(option2);
+                });
+                
+                console.log('Loaded', data.warehouses.length, 'warehouses');
+            } else {
+                console.error('Failed to load warehouses:', data.error || 'Unknown error');
+                // Add fallback warehouses
+                addFallbackWarehouses();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading warehouses:', error);
+            addFallbackWarehouses();
+        });
+}
+
+function addFallbackWarehouses() {
+    const fallbackWarehouses = [
+        {WarehouseCode: '7000-FG', WarehouseName: 'Finished Goods'},
+        {WarehouseCode: '7000-QFG', WarehouseName: 'QC Finished Goods'},
+        {WarehouseCode: '7000-RM', WarehouseName: 'Raw Materials'},
+        {WarehouseCode: '7000-WIP', WarehouseName: 'Work In Progress'}
+    ];
+    
+    const fromWarehouse = document.getElementById('from_warehouse');
+    const toWarehouse = document.getElementById('to_warehouse');
+    
+    fallbackWarehouses.forEach(warehouse => {
+        const option1 = new Option(
+            `${warehouse.WarehouseCode} - ${warehouse.WarehouseName}`,
+            warehouse.WarehouseCode
+        );
+        const option2 = option1.cloneNode(true);
+        
+        fromWarehouse.appendChild(option1);
+        toWarehouse.appendChild(option2);
+    });
+}
+</script>
 {% endblock %}
