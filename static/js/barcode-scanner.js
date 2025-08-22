@@ -47,25 +47,56 @@ class BarcodeScanner {
 
     async startScan(videoElement, onScanCallback) {
         try {
+            console.log('BarcodeScanner: Starting scan...');
             this.video = videoElement;
             this.onScanCallback = onScanCallback;
             
             // Check if camera is available
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                throw new Error('Camera not available');
+                throw new Error('Camera not available on this device');
             }
 
-            // Request camera permission
+            // Check if HTTPS or localhost (required for camera access)
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                throw new Error('Camera access requires HTTPS or localhost connection');
+            }
+
+            console.log('BarcodeScanner: Requesting camera permission...');
+            // Request camera permission with fallback options
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: { 
-                    facingMode: 'environment',
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 640, min: 320 },
+                    height: { ideal: 480, min: 240 }
                 }
             });
 
+            console.log('BarcodeScanner: Camera permission granted, setting up video...');
             this.video.srcObject = this.stream;
-            this.video.play();
+            
+            // Wait for video to be ready before starting scanning
+            return new Promise((resolve, reject) => {
+                this.video.onloadedmetadata = () => {
+                    this.video.play()
+                        .then(() => {
+                            console.log('BarcodeScanner: Video started, initializing QuaggaJS...');
+                            resolve();
+                        })
+                        .catch(reject);
+                };
+                
+                // Fallback timeout
+                setTimeout(() => {
+                    if (this.video.readyState >= 2) {
+                        this.video.play()
+                            .then(() => {
+                                console.log('BarcodeScanner: Video started via fallback...');
+                                resolve();
+                            })
+                            .catch(reject);
+                    }
+                }, 1000);
+            });
 
             // Initialize QuaggaJS
             this.quaggaConfig.inputStream.target = this.video;
@@ -314,13 +345,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Scanner utility functions
 function startBarcodeScanner(videoElementId, callback) {
+    console.log('Starting barcode scanner for video element:', videoElementId);
     const videoElement = document.getElementById(videoElementId);
-    if (videoElement && window.barcodeScanner) {
-        window.barcodeScanner.startScan(videoElement, callback);
+    
+    if (!videoElement) {
+        console.error('Video element not found:', videoElementId);
+        alert('Scanner not available - video element not found');
+        return;
     }
+    
+    // Initialize scanner if not exists
+    if (!window.barcodeScanner) {
+        console.log('Initializing new BarcodeScanner instance');
+        window.barcodeScanner = new BarcodeScanner();
+    }
+    
+    // Check for camera availability
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('Camera not available on this device');
+        alert('Camera not available on this device. Please use manual entry.');
+        return;
+    }
+
+    // Check if HTTPS or localhost (required for camera access)
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        console.error('Camera requires HTTPS connection');
+        alert('Camera access requires HTTPS connection. Please access the site with HTTPS or use manual entry.');
+        return;
+    }
+    
+    // Show scanner container
+    const scannerContainer = videoElement.parentElement;
+    if (scannerContainer) {
+        scannerContainer.style.display = 'block';
+    }
+    
+    // Start scanning
+    window.barcodeScanner.startScan(videoElement, callback)
+        .catch(error => {
+            console.error('Error starting barcode scanner:', error);
+            alert('Camera access denied. Please allow camera permissions and try again.');
+            if (scannerContainer) {
+                scannerContainer.style.display = 'none';
+            }
+        });
 }
 
 function stopBarcodeScanner() {
+    console.log('Stopping barcode scanner');
     if (window.barcodeScanner) {
         window.barcodeScanner.stopScan();
     }

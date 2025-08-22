@@ -516,6 +516,37 @@ function deleteSerialNumber(serialId, serialNumber, itemId) {
     }
 }
 
+// Camera scanning functions for Serial Transfer
+function scanItemCode() {
+    if (window.barcodeScanner) {
+        // Create temporary video element for scanning
+        const tempVideo = document.createElement('video');
+        tempVideo.id = 'tempItemScanVideo';
+        tempVideo.style.position = 'fixed';
+        tempVideo.style.top = '50%';
+        tempVideo.style.left = '50%';
+        tempVideo.style.transform = 'translate(-50%, -50%)';
+        tempVideo.style.width = '300px';
+        tempVideo.style.height = '200px';
+        tempVideo.style.zIndex = '9999';
+        tempVideo.style.border = '2px solid #007bff';
+        tempVideo.autoplay = true;
+        
+        document.body.appendChild(tempVideo);
+        
+        startBarcodeScanner('tempItemScanVideo', function(code) {
+            document.getElementById('item_code').value = code;
+            document.body.removeChild(tempVideo);
+            stopBarcodeScanner();
+        });
+    } else {
+        const manualCode = prompt('Enter item code manually:');
+        if (manualCode && manualCode.trim()) {
+            document.getElementById('item_code').value = manualCode.trim();
+        }
+    }
+}
+
 // Initialize Feather icons on page load
 feather.replace();
 </script>

@@ -25,6 +25,9 @@
                         <button class="btn btn-outline-secondary" type="button" onclick="startBinScanner()">
                             <i data-feather="camera"></i> Scan
                         </button>
+                        <button class="btn btn-outline-info" type="button" onclick="showManualBinEntry()" title="Manual Entry">
+                            <i data-feather="edit"></i> Manual
+                        </button>
                         <button class="btn btn-primary" type="button" onclick="searchBin()">
                             <i data-feather="search"></i> Search
                         </button>
@@ -217,6 +220,15 @@ function startBinScanner() {
         // Automatically search for the bin
         searchBin();
     });
+}
+
+// Add manual barcode entry fallback for bin scanning
+function showManualBinEntry() {
+    const manualCode = prompt('Enter bin code manually:');
+    if (manualCode && manualCode.trim()) {
+        document.getElementById('binCode').value = manualCode.trim();
+        searchBin();
+    }
 }
 
 function showQuickScan() {
