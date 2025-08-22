@@ -912,8 +912,8 @@ def validate_series_with_warehouse_sap(serial_number, item_code, warehouse_code)
         
         sap = SAPIntegration()
         
-        # First, validate with new warehouse-specific validation
-        warehouse_result = sap.validate_series_with_warehouse(serial_number, item_code)
+        # First, validate with new warehouse-specific validation including FromWarehouse
+        warehouse_result = sap.validate_series_with_warehouse(serial_number, item_code, warehouse_code)
         
         if warehouse_result.get('valid') and warehouse_result.get('available_in_warehouse'):
             # Series found in a warehouse with stock

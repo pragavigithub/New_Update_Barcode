@@ -2695,8 +2695,14 @@ class SAPIntegration:
         
         return enhanced_lines
 
-    def validate_series_with_warehouse(self, serial_number, item_code):
-        """Validate series against SAP B1 API using SQL Queries for warehouse validation"""
+    def validate_series_with_warehouse(self, serial_number, item_code, warehouse_code=None):
+        """Validate series against SAP B1 API using SQL Queries for warehouse validation
+        
+        Args:
+            serial_number: The series/serial number to validate
+            item_code: The item code to check against
+            warehouse_code: Optional warehouse code to check series availability in specific warehouse
+        """
         if not self.ensure_logged_in():
             logging.warning("SAP B1 not available, cannot validate series")
             return {
@@ -2708,10 +2714,15 @@ class SAPIntegration:
             # SAP B1 API endpoint for SQL Queries
             api_url = f"{self.base_url}/b1s/v1/SQLQueries('Series_Validation')/List"
             
-            # Request body with ParamList
-            payload = {
-                "ParamList": f"series='{serial_number}'&itemCode='{item_code}'"
-            }
+            # Request body with ParamList - include warehouse code if provided
+            if warehouse_code:
+                payload = {
+                    "ParamList": f"series='{serial_number}'&itemCode='{item_code}'&whsCode='{warehouse_code}'"
+                }
+            else:
+                payload = {
+                    "ParamList": f"series='{serial_number}'&itemCode='{item_code}'"
+                }
             
             # Make API call with existing session
             response = self.session.post(api_url, json=payload, timeout=10)
@@ -2720,22 +2731,31 @@ class SAPIntegration:
                 data = response.json()
                 
                 if data.get('value') and len(data['value']) > 0:
-                    # Series found in warehouse
+                    # Series found in the specified warehouse
                     series_data = data['value'][0]
                     return {
                         'valid': True,
                         'DistNumber': series_data.get('DistNumber'),
                         'ItemCode': series_data.get('ItemCode'),
                         'WhsCode': series_data.get('WhsCode'),
-                        'available_in_warehouse': True
+                        'available_in_warehouse': True,
+                        'message': f'Series {serial_number} is available in warehouse {series_data.get("WhsCode")}'
                     }
                 else:
-                    # Series not found in any warehouse with stock
-                    return {
-                        'valid': True,  # Series exists but no stock in warehouse
-                        'available_in_warehouse': False,
-                        'warning': f'Series {serial_number} exists but has no stock in any warehouse'
-                    }
+                    # Series not found in the specified warehouse
+                    if warehouse_code:
+                        return {
+                            'valid': True,  # Allow transfer to continue
+                            'available_in_warehouse': False,
+                            'warning': f'Series {serial_number} is not available in warehouse {warehouse_code}',
+                            'message': 'Transfer can continue - series will be moved from another location'
+                        }
+                    else:
+                        return {
+                            'valid': True,  # Series exists but no stock in warehouse
+                            'available_in_warehouse': False,
+                            'warning': f'Series {serial_number} exists but has no stock in any warehouse'
+                        }
             else:
                 return {
                     'valid': False,
