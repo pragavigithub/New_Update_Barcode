@@ -511,8 +511,8 @@ def serial_add_item(transfer_id):
         validated_count = 0
         for serial_number in serial_numbers:
             try:
-                # Validate serial number against SAP
-                validation_result = validate_serial_number_with_sap(serial_number, item_code)
+                # Validate serial number against SAP with warehouse check
+                validation_result = validate_series_with_warehouse_sap(serial_number, item_code, transfer.from_warehouse)
                 
                 serial_record = SerialNumberTransferSerial(
                     transfer_item_id=transfer_item.id,
@@ -877,7 +877,7 @@ def serial_edit_serial_number(serial_id):
             }), 400
         
         # Validate new serial number against SAP
-        validation_result = validate_serial_number_with_sap(new_serial_number, transfer_item.item_code)
+        validation_result = validate_series_with_warehouse_sap(new_serial_number, transfer_item.item_code, transfer.from_warehouse)
         
         # Update the serial number
         serial_record.serial_number = new_serial_number
@@ -902,8 +902,55 @@ def serial_edit_serial_number(serial_id):
         logging.error(f"Error editing serial number: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+def validate_series_with_warehouse_sap(serial_number, item_code, warehouse_code):
+    """Validate series against SAP B1 API with warehouse availability check"""
+    try:
+        # Use the existing SAP integration
+        from sap_integration import SAPIntegration
+        
+        sap = SAPIntegration()
+        
+        # First, validate with new warehouse-specific validation
+        warehouse_result = sap.validate_series_with_warehouse(serial_number, item_code)
+        
+        if warehouse_result.get('valid') and warehouse_result.get('available_in_warehouse'):
+            # Series found in a warehouse with stock
+            return {
+                'valid': True,
+                'SerialNumber': warehouse_result.get('DistNumber'),
+                'ItemCode': warehouse_result.get('ItemCode'),
+                'WhsCode': warehouse_result.get('WhsCode'),
+                'available_in_warehouse': True,
+                'validation_type': 'warehouse_specific'
+            }
+        elif warehouse_result.get('valid') and not warehouse_result.get('available_in_warehouse'):
+            # Series exists but no stock - fallback to basic validation
+            basic_result = sap.validate_serial_number_with_item(serial_number, item_code)
+            if basic_result.get('valid'):
+                return {
+                    'valid': True,
+                    'SerialNumber': basic_result.get('SerialNumber'),
+                    'SystemNumber': basic_result.get('SystemNumber'),
+                    'ItemCode': basic_result.get('ItemCode'),
+                    'warning': warehouse_result.get('warning'),
+                    'available_in_warehouse': False,
+                    'validation_type': 'basic_fallback'
+                }
+            else:
+                return basic_result
+        else:
+            # Validation failed
+            return warehouse_result
+            
+    except Exception as e:
+        logging.error(f"Error validating series with warehouse: {str(e)}")
+        return {
+            'valid': False,
+            'error': f'Validation error: {str(e)}'
+        }
+
 def validate_serial_number_with_sap(serial_number, item_code):
-    """Validate serial number against SAP B1 API using proper SAP integration"""
+    """Legacy validation function - kept for compatibility"""
     try:
         # Use the existing SAP integration
         from sap_integration import SAPIntegration
@@ -919,3 +966,87 @@ def validate_serial_number_with_sap(serial_number, item_code):
             'valid': False,
             'error': f'Validation error: {str(e)}'
         }
+
+@transfer_bp.route('/serial/validate', methods=['POST'])
+@login_required
+def validate_serial_api():
+    """API endpoint to validate serial number with warehouse check"""
+    try:
+        data = request.get_json()
+        if not data:
+            data = request.form
+            
+        serial_number = data.get('serial_number', '').strip()
+        item_code = data.get('item_code', '').strip()
+        warehouse_code = data.get('warehouse_code', '').strip()
+        
+        if not all([serial_number, item_code]):
+            return jsonify({
+                'success': False, 
+                'error': 'Serial number and item code are required'
+            }), 400
+        
+        # Validate the serial number
+        validation_result = validate_series_with_warehouse_sap(serial_number, item_code, warehouse_code)
+        
+        return jsonify({
+            'success': True,
+            'validation_result': validation_result
+        })
+        
+    except Exception as e:
+        logging.error(f"Error in serial validation API: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Validation error: {str(e)}'
+        }), 500
+
+@transfer_bp.route('/serial/serials/<int:serial_id>/validate', methods=['POST'])
+@login_required
+def revalidate_serial_number(serial_id):
+    """Re-validate a specific serial number in a transfer"""
+    try:
+        from models import SerialNumberTransferSerial
+        
+        serial_record = SerialNumberTransferSerial.query.get_or_404(serial_id)
+        transfer_item = serial_record.transfer_item
+        transfer = transfer_item.serial_transfer
+        
+        # Check permissions
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if transfer.status not in ['draft', 'submitted']:
+            return jsonify({'success': False, 'error': 'Can only validate serial numbers in draft or submitted transfers'}), 400
+        
+        # Re-validate the serial number
+        validation_result = validate_series_with_warehouse_sap(
+            serial_record.serial_number, 
+            transfer_item.item_code, 
+            transfer.from_warehouse
+        )
+        
+        # Update validation status
+        serial_record.is_validated = validation_result.get('valid', False)
+        serial_record.validation_error = validation_result.get('error') if not validation_result.get('valid') else validation_result.get('warning')
+        serial_record.system_serial_number = validation_result.get('SystemNumber') or validation_result.get('SerialNumber')
+        serial_record.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        logging.info(f"🔄 Re-validated serial number {serial_record.serial_number} in transfer {transfer.id}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Serial number {serial_record.serial_number} re-validated',
+            'is_validated': serial_record.is_validated,
+            'validation_error': serial_record.validation_error,
+            'available_in_warehouse': validation_result.get('available_in_warehouse', False),
+            'warehouse_code': validation_result.get('WhsCode'),
+            'validation_type': validation_result.get('validation_type', 'unknown')
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error re-validating serial number: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500

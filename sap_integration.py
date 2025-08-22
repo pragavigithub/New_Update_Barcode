@@ -2695,6 +2695,60 @@ class SAPIntegration:
         
         return enhanced_lines
 
+    def validate_series_with_warehouse(self, serial_number, item_code):
+        """Validate series against SAP B1 API using SQL Queries for warehouse validation"""
+        if not self.ensure_logged_in():
+            logging.warning("SAP B1 not available, cannot validate series")
+            return {
+                'valid': False,
+                'error': 'SAP B1 not available'
+            }
+        
+        try:
+            # SAP B1 API endpoint for SQL Queries
+            api_url = f"{self.base_url}/b1s/v1/SQLQueries('Series_Validation')/List"
+            
+            # Request body with ParamList
+            payload = {
+                "ParamList": f"series='{serial_number}'&itemCode='{item_code}'"
+            }
+            
+            # Make API call with existing session
+            response = self.session.post(api_url, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get('value') and len(data['value']) > 0:
+                    # Series found in warehouse
+                    series_data = data['value'][0]
+                    return {
+                        'valid': True,
+                        'DistNumber': series_data.get('DistNumber'),
+                        'ItemCode': series_data.get('ItemCode'),
+                        'WhsCode': series_data.get('WhsCode'),
+                        'available_in_warehouse': True
+                    }
+                else:
+                    # Series not found in any warehouse with stock
+                    return {
+                        'valid': True,  # Series exists but no stock in warehouse
+                        'available_in_warehouse': False,
+                        'warning': f'Series {serial_number} exists but has no stock in any warehouse'
+                    }
+            else:
+                return {
+                    'valid': False,
+                    'error': f'SAP API error: {response.status_code} - {response.text}'
+                }
+                
+        except Exception as e:
+            logging.error(f"Error validating series with SAP: {str(e)}")
+            return {
+                'valid': False,
+                'error': f'Validation error: {str(e)}'
+            }
+
     def validate_serial_number_with_item(self, serial_number, item_code):
         """Validate serial number against SAP B1 API with item code verification"""
         if not self.ensure_logged_in():
