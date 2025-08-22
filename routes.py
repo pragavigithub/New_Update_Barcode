@@ -3715,3 +3715,39 @@ def preview_grpo_json(grpo_id):
         import traceback
         logging.error(f"🔍 Full traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)})
+
+# API Routes for SPA
+@app.route('/api/auth/current_user')
+@login_required
+def api_current_user():
+    """Get current user information for API"""
+    try:
+        user_data = {
+            'id': current_user.id,
+            'username': current_user.username,
+            'email': current_user.email,
+            'first_name': current_user.first_name,
+            'last_name': current_user.last_name,
+            'role': current_user.role,
+            'branch_id': current_user.branch_id,
+            'branch_name': current_user.branch_name,
+            'permissions': {
+                'inventory_transfer': current_user.has_permission('inventory_transfer'),
+                'serial_transfer': current_user.has_permission('serial_transfer'),
+                'qc_dashboard': current_user.has_permission('qc_dashboard'),
+                'grpo': current_user.has_permission('grpo'),
+                'pick_list': current_user.has_permission('pick_list'),
+                'inventory_count': current_user.has_permission('inventory_count'),
+                'user_management': current_user.has_permission('user_management'),
+                'branch_management': current_user.has_permission('branch_management')
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'user': user_data
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting current user: {str(e)}")
+        return jsonify({'error': str(e)}), 500

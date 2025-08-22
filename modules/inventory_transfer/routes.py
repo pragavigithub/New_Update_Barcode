@@ -396,10 +396,20 @@ def log_status_change(transfer_id, previous_status, new_status, changed_by_id, n
 @transfer_bp.route('/serial')
 @login_required
 def serial_index():
-    """Serial Number Transfer main page with pagination and user filtering"""
+    """Serial Number Transfer main page - serves the SPA"""
     if not current_user.has_permission('serial_transfer'):
         flash('Access denied - Serial Transfer permissions required', 'error')
         return redirect(url_for('dashboard'))
+    
+    return render_template('serial_transfer_spa.html')
+
+# API Routes for Serial Transfers
+@transfer_bp.route('/api/serial')
+@login_required
+def api_serial_index():
+    """API endpoint for serial transfers with pagination and search"""
+    if not current_user.has_permission('serial_transfer'):
+        return jsonify({'error': 'Access denied - Serial Transfer permissions required'}), 403
     
     # Get pagination parameters
     page = request.args.get('page', 1, type=int)
@@ -437,32 +447,66 @@ def serial_index():
         page=page, per_page=per_page, error_out=False
     )
     
-    return render_template('serial_transfer_index.html', 
-                         transfers=transfers_paginated.items,
-                         pagination=transfers_paginated,
-                         search=search,
-                         per_page=per_page,
-                         user_based=user_based,
-                         current_user=current_user)
-
-@transfer_bp.route('/serial/create', methods=['GET', 'POST'])
-@login_required
-def serial_create():
-    """Create new Serial Number Transfer"""
-    if not current_user.has_permission('serial_transfer'):
-        flash('Access denied - Serial Transfer permissions required', 'error')
-        return redirect(url_for('dashboard'))
+    # Convert transfers to JSON-serializable format
+    transfers_data = []
+    for transfer in transfers_paginated.items:
+        transfer_dict = {
+            'id': transfer.id,
+            'transfer_number': transfer.transfer_number,
+            'from_warehouse': transfer.from_warehouse,
+            'to_warehouse': transfer.to_warehouse,
+            'status': transfer.status,
+            'notes': transfer.notes,
+            'created_at': transfer.created_at.isoformat() if transfer.created_at else None,
+            'updated_at': transfer.updated_at.isoformat() if transfer.updated_at else None,
+            'user_id': transfer.user_id,
+            'items_count': len(transfer.items) if transfer.items else 0,
+            'qc_notes': transfer.qc_notes,
+            'sap_document_number': transfer.sap_document_number
+        }
+        transfers_data.append(transfer_dict)
     
-    if request.method == 'POST':
+    # Pagination info
+    pagination_data = {
+        'page': transfers_paginated.page,
+        'pages': transfers_paginated.pages,
+        'per_page': transfers_paginated.per_page,
+        'total': transfers_paginated.total,
+        'has_next': transfers_paginated.has_next,
+        'has_prev': transfers_paginated.has_prev,
+        'next_num': transfers_paginated.next_num,
+        'prev_num': transfers_paginated.prev_num
+    }
+    
+    return jsonify({
+        'success': True,
+        'transfers': transfers_data,
+        'pagination': pagination_data,
+        'filters': {
+            'search': search,
+            'per_page': per_page,
+            'user_based': user_based
+        }
+    })
+
+@transfer_bp.route('/api/serial', methods=['POST'])
+@login_required
+def api_serial_create():
+    """API endpoint to create new Serial Number Transfer"""
+    if not current_user.has_permission('serial_transfer'):
+        return jsonify({'error': 'Access denied - Serial Transfer permissions required'}), 403
+    
+    try:
+        data = request.get_json()
+        
         # Auto-generate transfer number
         transfer_number = generate_transfer_number()
-        from_warehouse = request.form.get('from_warehouse')
-        to_warehouse = request.form.get('to_warehouse')
-        notes = request.form.get('notes', '')
+        from_warehouse = data.get('from_warehouse')
+        to_warehouse = data.get('to_warehouse')
+        notes = data.get('notes', '')
         
         if not all([from_warehouse, to_warehouse]):
-            flash('From Warehouse and To Warehouse are required', 'error')
-            return render_template('serial_create_transfer.html')
+            return jsonify({'error': 'From Warehouse and To Warehouse are required'}), 400
         
         # Create new transfer with auto-generated number
         transfer = SerialNumberTransfer(
@@ -478,10 +522,29 @@ def serial_create():
         db.session.commit()
         
         logging.info(f"✅ Serial Number Transfer {transfer_number} created by user {current_user.username}")
-        flash(f'Serial Number Transfer {transfer_number} created successfully', 'success')
-        return redirect(url_for('inventory_transfer.serial_detail', transfer_id=transfer.id))
-    
-    return render_template('serial_create_transfer.html')
+        
+        # Return the created transfer data
+        transfer_data = {
+            'id': transfer.id,
+            'transfer_number': transfer.transfer_number,
+            'from_warehouse': transfer.from_warehouse,
+            'to_warehouse': transfer.to_warehouse,
+            'status': transfer.status,
+            'notes': transfer.notes,
+            'created_at': transfer.created_at.isoformat() if transfer.created_at else None,
+            'user_id': transfer.user_id,
+            'items_count': 0
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': f'Serial Number Transfer {transfer_number} created successfully',
+            'transfer': transfer_data
+        })
+        
+    except Exception as e:
+        logging.error(f"Error creating serial transfer: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @transfer_bp.route('/serial/<int:transfer_id>')
 @login_required
