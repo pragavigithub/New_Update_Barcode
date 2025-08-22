@@ -207,7 +207,8 @@ BACKUP_PATH=backups/
                 ('postal_code', 'VARCHAR(20)'),
                 ('country', 'VARCHAR(50)'),
                 ('warehouse_codes', 'TEXT'),
-                ('is_default', 'BOOLEAN DEFAULT FALSE')
+                ('is_default', 'BOOLEAN DEFAULT FALSE'),
+                ('active', 'BOOLEAN DEFAULT TRUE')  # Required by application code
             ]
             
             for col_name, col_def in branch_columns:
@@ -220,6 +221,34 @@ BACKUP_PATH=backups/
                     logger.info(f"✅ Added missing column: branches.{col_name}")
                 except Exception as e:
                     logger.warning(f"⚠️ Could not add column branches.{col_name}: {e}")
+        
+        # Check users table columns - CRITICAL: Add missing 'active' column
+        if self.table_exists('users'):
+            missing_user_columns = []
+            user_columns = [
+                ('active', 'BOOLEAN DEFAULT TRUE'),  # Required by application code
+                ('first_name', 'VARCHAR(80)'),
+                ('last_name', 'VARCHAR(80)'),
+                ('branch_id', 'VARCHAR(10)'),
+                ('branch_name', 'VARCHAR(100)'),
+                ('default_branch_id', 'VARCHAR(10)'),
+                ('must_change_password', 'BOOLEAN DEFAULT FALSE'),
+                ('last_login', 'DATETIME'),
+                ('permissions', 'TEXT'),
+                ('created_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP'),
+                ('updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
+            ]
+            
+            for col_name, col_def in user_columns:
+                if not self.column_exists('users', col_name):
+                    missing_user_columns.append((col_name, col_def))
+            
+            for col_name, col_def in missing_user_columns:
+                try:
+                    self.execute_query(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+                    logger.info(f"✅ Added missing column: users.{col_name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not add column users.{col_name}: {e}")
         
         # Check pick_lists table columns for SAP B1 compatibility
         if self.table_exists('pick_lists'):
