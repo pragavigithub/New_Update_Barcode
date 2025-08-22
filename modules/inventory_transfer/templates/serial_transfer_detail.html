@@ -56,6 +56,52 @@ Serial Number Transfer {{ transfer.transfer_number }}
                             <td><strong>To Warehouse:</strong></td>
                             <td>{{ transfer.to_warehouse }}</td>
                         </tr>
+<!--                        <tr>-->
+<!--                            <td><strong>Status:</strong></td>-->
+<!--                            <td>-->
+<!--                                {% if transfer.status == 'draft' %}-->
+<!--                                <span class="badge bg-secondary">Draft</span>-->
+<!--                                {% elif transfer.status == 'submitted' %}-->
+<!--                                <span class="badge bg-warning text-dark">Submitted</span>-->
+<!--                                {% elif transfer.status == 'qc_approved' %}-->
+<!--                                <span class="badge bg-success">QC Approved</span>-->
+<!--                                {% elif transfer.status == 'posted' %}-->
+<!--                                <span class="badge bg-primary">Posted to SAP</span>-->
+<!--                                {% elif transfer.status == 'rejected' %}-->
+<!--                                <span class="badge bg-danger">Rejected</span>-->
+<!--                                {% endif %}-->
+<!--                            </td>-->
+<!--                        </tr>-->
+<!--                        {% if transfer.sap_document_number %}-->
+<!--                        <tr>-->
+<!--                            <td><strong>SAP Document:</strong></td>-->
+<!--                            <td><code>{{ transfer.sap_document_number }}</code></td>-->
+<!--                        </tr>-->
+<!--                        {% endif %}-->
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            {% if transfer.notes %}
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Transfer Information</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless table-sm">
+<!--                        <tr>-->
+<!--                            <td><strong>Transfer Number:</strong></td>-->
+<!--                            <td>{{ transfer.transfer_number }}</td>-->
+<!--                        </tr>-->
+<!--                        <tr>-->
+<!--                            <td><strong>From Warehouse:</strong></td>-->
+<!--                            <td>{{ transfer.from_warehouse }}</td>-->
+<!--                        </tr>-->
+<!--                        <tr>-->
+<!--                            <td><strong>To Warehouse:</strong></td>-->
+<!--                            <td>{{ transfer.to_warehouse }}</td>-->
+<!--                        </tr>-->
                         <tr>
                             <td><strong>Status:</strong></td>
                             <td>
@@ -78,19 +124,18 @@ Serial Number Transfer {{ transfer.transfer_number }}
                             <td><code>{{ transfer.sap_document_number }}</code></td>
                         </tr>
                         {% endif %}
+                        <tr>
+                            <td><strong>Notes:</strong></td>
+                            <td><code>{{ transfer.notes }}</code></td>
+                        </tr>
                     </table>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            {% if transfer.notes %}
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0">Notes</h6>
-                </div>
-                <div class="card-body">
-                    <p class="mb-0">{{ transfer.notes }}</p>
-                </div>
+<!--                <div class="card-header">-->
+<!--                    <h6 class="mb-0">Notes</h6>-->
+<!--                </div>-->
+<!--                <div class="card-body">-->
+<!--                    <p class="mb-0">{{ transfer.notes }}</p>-->
+<!--                </div>-->
             </div>
             {% endif %}
         </div>
