@@ -313,6 +313,70 @@ def get_batches():
             ]
         })
 
+@app.route('/api/get-item-name', methods=['GET'])
+def get_item_name():
+    """Get item name based on item code from SAP B1"""
+    try:
+        item_code = request.args.get('item_code')
+        if not item_code:
+            return jsonify({'success': False, 'error': 'Item code required'}), 400
+        
+        sap = SAPIntegration()
+        
+        # Try to get item name from SAP B1
+        if sap.ensure_logged_in():
+            try:
+                # Use the SAP endpoint provided by user: https://192.168.0.127:50000/b1s/v1/Items?$select=ItemCode,ItemName
+                url = f"{sap.base_url}/b1s/v1/Items"
+                params = {
+                    '$filter': f"ItemCode eq '{item_code}'",
+                    '$select': 'ItemCode,ItemName'
+                }
+                response = sap.session.get(url, params=params, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    items = data.get('value', [])
+                    
+                    if items and len(items) > 0:
+                        item = items[0]
+                        item_name = item.get('ItemName') or f'Item {item_code}'
+                        
+                        logging.info(f"Retrieved item name for {item_code}: {item_name}")
+                        return jsonify({
+                            'success': True,
+                            'item_code': item_code,
+                            'item_name': item_name
+                        })
+                    else:
+                        # Item not found in SAP
+                        return jsonify({
+                            'success': False,
+                            'error': f'Item code {item_code} not found in SAP B1'
+                        }), 404
+                        
+            except Exception as sap_error:
+                logging.error(f"Error getting item from SAP: {str(sap_error)}")
+                # Return fallback response
+                return jsonify({
+                    'success': True,
+                    'item_code': item_code,
+                    'item_name': f'Item {item_code}',
+                    'fallback': True
+                })
+        
+        # Return fallback if SAP not available
+        return jsonify({
+            'success': True,
+            'item_code': item_code,
+            'item_name': f'Item {item_code}',
+            'fallback': True
+        })
+        
+    except Exception as e:
+        logging.error(f"Error in get_item_name API: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))

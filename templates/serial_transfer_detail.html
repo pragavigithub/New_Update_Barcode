@@ -562,6 +562,7 @@ function fetchItemName() {
                     statusElement.className = 'text-success';
                 }
             } else {
+                // Handle case where API returns success: false
                 itemNameInput.value = `Item ${itemCode}`;
                 itemNameInput.classList.add('is-invalid');
                 itemNameInput.classList.remove('is-valid');
