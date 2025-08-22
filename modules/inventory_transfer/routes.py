@@ -11,7 +11,9 @@ import random
 import string
 from datetime import datetime
 
-transfer_bp = Blueprint('inventory_transfer', __name__, url_prefix='/inventory_transfer')
+transfer_bp = Blueprint('inventory_transfer', __name__, 
+                         url_prefix='/inventory_transfer',
+                         template_folder='templates')
 
 def generate_transfer_number():
     """Generate unique transfer number for serial transfers"""
