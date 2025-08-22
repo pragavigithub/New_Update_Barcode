@@ -519,10 +519,10 @@ def serial_add_item(transfer_id):
                 serial_record = SerialNumberTransferSerial(
                     transfer_item_id=transfer_item.id,
                     serial_number=serial_number,
-                    internal_serial_number=validation_result.get('SerialNumber', serial_number),
+                    internal_serial_number=validation_result.get('SerialNumber') or validation_result.get('DistNumber', serial_number),
                     system_serial_number=validation_result.get('SystemNumber'),
                     is_validated=validation_result.get('valid', False),
-                    validation_error=validation_result.get('error')
+                    validation_error=validation_result.get('error') or validation_result.get('warning')
                 )
                 
                 if validation_result.get('valid'):
@@ -884,7 +884,7 @@ def serial_edit_serial_number(serial_id):
         # Update the serial number
         serial_record.serial_number = new_serial_number
         serial_record.is_validated = validation_result.get('valid', False)
-        serial_record.validation_error = validation_result.get('error') if not validation_result.get('valid') else None
+        serial_record.validation_error = validation_result.get('error') or validation_result.get('warning')
         serial_record.updated_at = datetime.utcnow()
         
         db.session.commit()
