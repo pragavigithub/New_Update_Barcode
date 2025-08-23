@@ -146,6 +146,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/wms-api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/serial-transfers.js') }}"></script>
 {% endblock %}

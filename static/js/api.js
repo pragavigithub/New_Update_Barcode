@@ -35,7 +35,7 @@ class WMSApi {
     // Serial Transfer APIs
     async getSerialTransfers(params = {}) {
         const queryString = new URLSearchParams(params).toString();
-        const url = `${this.baseUrl}/api/serial${queryString ? '?' + queryString : ''}`;
+        const url = `/inventory_transfer/api/serial${queryString ? '?' + queryString : ''}`;
         return this.fetchWithAuth(url);
     }
 
@@ -44,7 +44,7 @@ class WMSApi {
     }
 
     async createSerialTransfer(data) {
-        return this.fetchWithAuth(`${this.baseUrl}/api/serial`, {
+        return this.fetchWithAuth(`/inventory_transfer/api/serial`, {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -83,7 +83,7 @@ class WMSApi {
     }
 
     async reopenTransfer(id) {
-        return this.fetchWithAuth(`${this.baseUrl}/serial/${id}/reopen`, {
+        return this.fetchWithAuth(`/inventory_transfer/serial/${id}/reopen`, {
             method: 'POST'
         });
     }
