@@ -120,8 +120,46 @@ MYSQL_USER={config['user']}
 MYSQL_PASSWORD={config['password']}
 MYSQL_DATABASE={config['database']}
 
-# PostgreSQL (Replit Cloud Fallback) - Auto-configured by Replit
+# PostgreSQL (Replit Cloud Environment) - Auto-configured by Replit
 # DATABASE_URL will be overridden by Replit in cloud environment
+# When deploying to Replit, PostgreSQL is the primary database
+
+# Dual Database Support (PostgreSQL Primary + MySQL Sync)
+ENABLE_DUAL_DB=true
+POSTGRES_PRIORITY=true
+
+# =================================
+# SAP B1 INTEGRATION
+# =================================
+SAP_B1_SERVER=https://10.112.253.173:50000
+SAP_B1_USERNAME=manager
+SAP_B1_PASSWORD=1422
+SAP_B1_COMPANY_DB=SBODemoUS
+
+# =================================
+# APPLICATION SETTINGS
+# =================================
+SESSION_SECRET=your-session-secret-key-change-in-production
+FLASK_ENV=development
+FLASK_DEBUG=true
+
+# =================================
+# FEATURE FLAGS
+# =================================
+ENABLE_SERIAL_TRANSFERS=true
+ENABLE_BATCH_TRANSFERS=true
+ENABLE_QC_DASHBOARD=true
+ENABLE_BIN_SCANNING=true
+ENABLE_LABEL_PRINTING=true
+ENABLE_INVENTORY_COUNTING=true
+
+# =================================
+# SECURITY SETTINGS
+# =================================
+# Enable HTTPS in production
+FORCE_HTTPS=false
+# Session timeout in minutes
+SESSION_TIMEOUT=480
 
 # =================================
 # APPLICATION SECURITY

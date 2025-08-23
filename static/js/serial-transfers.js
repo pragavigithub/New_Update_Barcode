@@ -340,8 +340,8 @@ class SerialTransferManager {
     }
 
     viewTransfer(id) {
-        window.location.hash = `#/transfers/${id}`;
-        // This will be handled by the router
+        // Navigate directly to the serial transfer detail page
+        window.location.href = `/inventory_transfer/serial/${id}`;
     }
 
     editTransfer(id) {
