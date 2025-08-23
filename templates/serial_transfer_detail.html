@@ -144,15 +144,15 @@
                                     <td>
                                         {% if transfer.status == 'draft' %}
                                         <div class="btn-group">
-                                            <button class="btn btn-sm btn-primary" onclick="viewItemDetails({{ item.id }})">
+                                            <button class="btn btn-sm btn-primary" onclick="viewItemDetails('{{ item.id }}')">
                                                 <i data-feather="eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-danger" onclick="removeItem({{ item.id }})">
+                                            <button class="btn btn-sm btn-danger" onclick="removeItem('{{ item.id }}')">
                                                 <i data-feather="trash-2"></i>
                                             </button>
                                         </div>
                                         {% else %}
-                                        <button class="btn btn-sm btn-outline-primary" onclick="viewItemDetails({{ item.id }})">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="viewItemDetails('{{ item.id }}')">
                                             <i data-feather="eye"></i> View
                                         </button>
                                         {% endif %}
@@ -185,22 +185,22 @@
                     <div class="d-flex gap-2 justify-content-end">
                         {% if transfer.status == 'draft' %}
                             {% if transfer.items %}
-                            <button class="btn btn-success" onclick="submitTransfer({{ transfer.id }})">
+                            <button class="btn btn-success" onclick="submitTransfer('{{ transfer.id }}')">
                                 <i data-feather="send"></i> Submit for QC
                             </button>
                             {% endif %}
-                            <button class="btn btn-danger" onclick="deleteTransfer({{ transfer.id }})">
+                            <button class="btn btn-danger" onclick="deleteTransfer('{{ transfer.id }}')">
                                 <i data-feather="trash-2"></i> Delete Transfer
                             </button>
                         {% elif transfer.status == 'submitted' and (current_user.has_permission('qc_dashboard') or current_user.role in ['admin', 'manager']) %}
-                            <button class="btn btn-success" onclick="approveTransfer({{ transfer.id }})">
+                            <button class="btn btn-success" onclick="approveTransfer('{{ transfer.id }}')">
                                 <i data-feather="check"></i> QC Approve
                             </button>
-                            <button class="btn btn-danger" onclick="rejectTransfer({{ transfer.id }})">
+                            <button class="btn btn-danger" onclick="rejectTransfer('{{ transfer.id }}')">
                                 <i data-feather="x"></i> QC Reject
                             </button>
                         {% elif transfer.status == 'rejected' %}
-                            <button class="btn btn-warning" onclick="reopenTransfer({{ transfer.id }})">
+                            <button class="btn btn-warning" onclick="reopenTransfer('{{ transfer.id }}')">
                                 <i data-feather="refresh-cw"></i> Reopen Transfer
                             </button>
                         {% endif %}

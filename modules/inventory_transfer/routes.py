@@ -879,47 +879,6 @@ def serial_reopen(transfer_id):
     except Exception as e:
         logging.error(f"Error reopening serial transfer: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
-    """Reopen a rejected serial number transfer"""
-    try:
-        from models import SerialNumberTransfer
-        
-        transfer = SerialNumberTransfer.query.get_or_404(transfer_id)
-        
-        # Check permissions - only admin, manager, or transfer owner can reopen
-        if current_user.role not in ['admin', 'manager'] and transfer.user_id != current_user.id:
-            return jsonify({'success': False, 'error': 'Access denied - insufficient permissions'}), 403
-        
-        if transfer.status != 'rejected':
-            return jsonify({'success': False, 'error': 'Only rejected transfers can be reopened'}), 400
-        
-        # Reset transfer status to draft
-        old_status = transfer.status
-        transfer.status = 'draft'
-        transfer.qc_approver_id = None
-        transfer.qc_approved_at = None
-        transfer.qc_notes = None
-        transfer.updated_at = datetime.utcnow()
-        
-        # Reset all items to draft status if they have qc_status
-        for item in transfer.items:
-            if hasattr(item, 'qc_status'):
-                item.qc_status = None
-        
-        db.session.commit()
-        
-        # Log status change
-        log_status_change(transfer_id, old_status, 'draft', current_user.id, 'Transfer reopened from rejected status')
-        
-        logging.info(f"🔄 Serial Transfer {transfer_id} reopened from rejected status by user {current_user.id}")
-        return jsonify({
-            'success': True,
-            'message': 'Transfer reopened successfully. You can now make changes and resubmit.',
-            'status': 'draft'
-        })
-        
-    except Exception as e:
-        logging.error(f"Error reopening serial transfer: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 @transfer_bp.route('/serial/items/<int:item_id>/delete', methods=['POST'])
 @login_required
